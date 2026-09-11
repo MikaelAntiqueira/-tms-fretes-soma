@@ -13,7 +13,7 @@ interface Kpis {
 }
 
 async function getKpis(): Promise<Kpis> {
-  const [cotacoesRes, contratacoesRes, cruzadasRes, valoresRes] = await Promise.all([
+  const [cotacoesRes, contratacoesRes, cruzadasRes, somaRes] = await Promise.all([
     // FATO — total de sessões de cotação (Enviado↔Recebido casados por chave estável).
     supabase.from("cotacoes").select("*", { count: "exact", head: true }),
     // FATO — total de contratações (export "Contratados" do painel Frete Rápido).
@@ -23,27 +23,24 @@ async function getKpis(): Promise<Kpis> {
       .from("contratacoes")
       .select("*", { count: "exact", head: true })
       .not("cotacao_id", "is", null),
-    // Valores para somar o Frete Contratado só das contratações cruzadas —
-    // equivalente a: SELECT sum(valor_frete_contratado) FROM contratacoes
-    // WHERE cotacao_id IS NOT NULL. Soma feita em JS (não em SQL) de propósito:
-    // nesta fase de prova de conceito, mantém a conta auditável a olho nu.
-    supabase.from("contratacoes").select("valor_frete_contratado").not("cotacao_id", "is", null),
+    // Soma do Frete Contratado só das contratações cruzadas — feita DENTRO do
+    // banco via RPC (function `sum_frete_contratado_cruzadas`, migration
+    // `fn_sum_frete_contratado_cruzadas`), não buscando as linhas e somando
+    // em JS: o PostgREST/Supabase limita a 1000 linhas por requisição por
+    // padrão, e há 5.194 linhas cruzadas — somar no cliente vinha incompleto
+    // (achado em produção: R$ 84.691,87 em vez de R$ 494.417,43).
+    supabase.rpc("sum_frete_contratado_cruzadas"),
   ]);
 
-  for (const res of [cotacoesRes, contratacoesRes, cruzadasRes, valoresRes]) {
+  for (const res of [cotacoesRes, contratacoesRes, cruzadasRes, somaRes]) {
     if (res.error) throw new Error(res.error.message);
   }
-
-  const freteContratadoCruzadas = (valoresRes.data ?? []).reduce(
-    (acc, row) => acc + Number(row.valor_frete_contratado ?? 0),
-    0
-  );
 
   return {
     totalCotacoes: cotacoesRes.count ?? 0,
     totalContratacoes: contratacoesRes.count ?? 0,
     contratacoesCruzadas: cruzadasRes.count ?? 0,
-    freteContratadoCruzadas,
+    freteContratadoCruzadas: Number(somaRes.data ?? 0),
   };
 }
 
