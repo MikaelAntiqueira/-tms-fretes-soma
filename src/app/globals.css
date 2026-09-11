@@ -1,0 +1,404 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   TOKENS DE IDENTIDADE VISUAL — portados do Artifact "Fretes Cotado x
+   Contratado" (c0abf79e-..., v39), Etapa 1.1 do mapa de migração.
+   Valores lidos direto do CSS publicado — NÃO são aproximação.
+   Preservar 1:1 (R-PRESERVAR / mapa de migração, Etapa 3: "identidade visual
+   pixel-a-pixel"). Qualquer ajuste de paleta precisa de decisão explícita,
+   não é "melhoria" livre.
+   ========================================================================== */
+:root {
+  --surface-page: #eef3f6;
+  --surface-card: #ffffff;
+  --surface-card-alt: #f5f9fb;
+  --surface-sunken: #e7eef2;
+  --text-primary: #0d2436;
+  --text-secondary: #4f758e;
+  --text-muted: #7f97a6;
+  --border: rgba(13, 36, 54, 0.12);
+  --border-strong: rgba(13, 36, 54, 0.22);
+
+  --brand-900: #005285;
+  --brand-700: #088cb3;
+  --brand-500: #329dbb;
+  --brand-300: #5fb0c5;
+  --brand-slate: #4f758e;
+  --accent: #088cb3;
+  --accent-ink: #ffffff;
+  --focus: #005285;
+
+  --good: #0ca30c;
+  --warning: #c98500;
+  --serious: #c9612f;
+  --critical: #d03b3b;
+  --good-bg: rgba(12, 163, 12, 0.1);
+  --warning-bg: rgba(201, 133, 0, 0.1);
+  --serious-bg: rgba(201, 97, 47, 0.1);
+  --critical-bg: rgba(208, 59, 59, 0.1);
+  --info-bg: rgba(8, 140, 179, 0.09);
+
+  /* Paleta categórica (gráficos/séries) */
+  --t1: #2a78d6;
+  --t2: #eb6834;
+  --t3: #1baf7a;
+  --t4: #c98500;
+  --t5: #e0629a;
+  --t6: #1a8f1a;
+  --t7: #4a3aa7;
+
+  --shadow-card: 0 1px 2px rgba(13, 36, 54, 0.06), 0 8px 24px -12px rgba(13, 36, 54, 0.14);
+  --radius-card: 14px;
+  --radius-sm: 8px;
+  color-scheme: light;
+}
+
+/* Dark mode automático (prefers-color-scheme), a menos que o usuário force
+   claro via data-theme="light" */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-page: #0b1b26;
+    --surface-card: #122333;
+    --surface-card-alt: #0f2836;
+    --surface-sunken: #0a1a24;
+    --text-primary: #eef6fa;
+    --text-secondary: #9fc1d6;
+    --text-muted: #6f93a8;
+    --border: rgba(214, 235, 247, 0.12);
+    --border-strong: rgba(214, 235, 247, 0.22);
+    --brand-900: #3fa6dc;
+    --brand-700: #4fc0e8;
+    --brand-500: #5fb0c5;
+    --brand-300: #7fc4d6;
+    --accent: #4fc0e8;
+    --accent-ink: #04212f;
+    --focus: #7fc4d6;
+    --good: #3fcf5a;
+    --warning: #f0b429;
+    --serious: #f0895c;
+    --critical: #f2695f;
+    --good-bg: rgba(63, 207, 90, 0.14);
+    --warning-bg: rgba(240, 180, 41, 0.14);
+    --serious-bg: rgba(240, 137, 92, 0.14);
+    --critical-bg: rgba(242, 105, 95, 0.14);
+    --info-bg: rgba(79, 192, 232, 0.12);
+    --t1: #5b9fe8;
+    --t2: #f08a5e;
+    --t3: #3ecf9a;
+    --t4: #e0a83f;
+    --t5: #ee88b3;
+    --t6: #4fc25f;
+    --t7: #8f7fe0;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+
+/* Dark mode manual (independe do SO) — controlado pelo ThemeToggle */
+:root[data-theme="dark"] {
+  --surface-page: #0b1b26;
+  --surface-card: #122333;
+  --surface-card-alt: #0f2836;
+  --surface-sunken: #0a1a24;
+  --text-primary: #eef6fa;
+  --text-secondary: #9fc1d6;
+  --text-muted: #6f93a8;
+  --border: rgba(214, 235, 247, 0.12);
+  --border-strong: rgba(214, 235, 247, 0.22);
+  --brand-900: #3fa6dc;
+  --brand-700: #4fc0e8;
+  --brand-500: #5fb0c5;
+  --brand-300: #7fc4d6;
+  --accent: #4fc0e8;
+  --accent-ink: #04212f;
+  --focus: #7fc4d6;
+  --good: #3fcf5a;
+  --warning: #f0b429;
+  --serious: #f0895c;
+  --critical: #f2695f;
+  --good-bg: rgba(63, 207, 90, 0.14);
+  --warning-bg: rgba(240, 180, 41, 0.14);
+  --serious-bg: rgba(240, 137, 92, 0.14);
+  --critical-bg: rgba(242, 105, 95, 0.14);
+  --info-bg: rgba(79, 192, 232, 0.12);
+  --t1: #5b9fe8;
+  --t2: #f08a5e;
+  --t3: #3ecf9a;
+  --t4: #e0a83f;
+  --t5: #ee88b3;
+  --t6: #4fc25f;
+  --t7: #8f7fe0;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* Liga os tokens acima às utilities do Tailwind v4 (bg-surface-card,
+   text-brand-700, etc.) sem duplicar valores. */
+@theme inline {
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-card-alt: var(--surface-card-alt);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-brand-900: var(--brand-900);
+  --color-brand-700: var(--brand-700);
+  --color-brand-500: var(--brand-500);
+  --color-brand-300: var(--brand-300);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --color-good-bg: var(--good-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-serious-bg: var(--serious-bg);
+  --color-critical-bg: var(--critical-bg);
+  --color-info-bg: var(--info-bg);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-t5: var(--t5);
+  --color-t6: var(--t6);
+  --color-t7: var(--t7);
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-heading: var(--font-manrope);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-ibm-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--brand-700);
+}
+
+::selection {
+  background: var(--brand-300);
+  color: #04212f;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Componentes da página de prova de conceito (Fase 5 — esqueleto).
+   Deliberadamente simples: o dashboard completo (16 gráficos, 5 páginas,
+   motor de filtro) é portado em fases seguintes, uma peça de cada vez.
+   ========================================================================== */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: linear-gradient(150deg, var(--brand-900), var(--brand-700) 65%, var(--brand-500));
+  color: #fff;
+  padding: 28px 24px;
+}
+
+.app-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  font: 600 11px/1 var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.app-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 6px 0 4px;
+  color: #fff;
+}
+
+.app-header p {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 58ch;
+  margin: 0;
+}
+
+main.content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  width: 100%;
+  flex: 1;
+}
+
+.section-label {
+  font: 700 11px var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.kpi-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpi-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+
+.kpi-card .lbl {
+  font: 700 11px var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.kpi-card .val {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 6px;
+  letter-spacing: -0.01em;
+}
+
+.kpi-card .note {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.kpi-card .badge {
+  display: inline-block;
+  font: 700 9.5px var(--font-ibm-plex-mono), monospace;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+  background: var(--info-bg);
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+}
+
+.status-banner {
+  margin-top: 24px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: var(--good-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--good);
+  color: var(--text-secondary);
+}
+
+.status-banner.erro {
+  background: var(--critical-bg);
+  border-left-color: var(--critical);
+}
+
+.status-banner b {
+  color: var(--text-primary);
+}
+
+.provisorio-note {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.provisorio-note b {
+  color: var(--text-primary);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.theme-toggle button {
+  all: unset;
+  cursor: pointer;
+  font: 600 11px var(--font-ibm-plex-sans), sans-serif;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 5px 10px;
+  border-radius: 99px;
+}
+
+.theme-toggle button.on {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand-900);
+}
+
+footer.app-footer {
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+footer.app-footer a {
+  color: var(--text-secondary);
+}
