@@ -260,12 +260,29 @@ a {
   margin: 0;
 }
 
+.app-header nav.crumbs {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.app-header nav.crumbs a {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 600;
+}
+.app-header nav.crumbs a:hover {
+  text-decoration: underline;
+}
+
 main.content {
   max-width: 960px;
   margin: 0 auto;
   padding: 32px 24px 64px;
   width: 100%;
   flex: 1;
+}
+
+main.content.wide {
+  max-width: 1320px;
 }
 
 .section-label {
@@ -401,4 +418,134 @@ footer.app-footer {
 
 footer.app-footer a {
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Página "Ontem" (D-1) — classes portadas 1:1 do Artifact original
+   (c0abf79e-..., v40), Fase 5 do mapa de migração. Valores lidos direto do
+   CSS publicado (mesmas regras, mesmos tokens) — não é uma reinterpretação
+   visual. Reutilizadas por src/app/ontem/page.tsx.
+   ========================================================================== */
+section.bloc { margin-top: 34px; }
+
+.bloc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.bloc-head h2 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.bloc-head .desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.grid { display: grid; gap: 14px; }
+.grid > * { min-width: 0; }
+.grid.cols-auto { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+.card h3 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.card .sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
+
+/* ---- KPI tiles ---- */
+.kpi { display: flex; flex-direction: column; gap: 6px; min-height: 118px; position: relative; }
+.kpi .lbl {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--text-secondary); text-transform: uppercase;
+}
+.kpi .val {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 25px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;
+}
+.kpi .val small { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.kpi .foot { font-size: 11px; color: var(--text-muted); margin-top: auto; }
+
+/* Página "Ontem": os KPIs do topo, mesmo tratamento visual do Controle
+   Operacional no Artifact original (borda superior de destaque). */
+.op-kpis { grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); }
+.op-kpis .kpi {
+  min-height: 96px; padding: 14px 16px; gap: 4px;
+  border-top: 2px solid var(--brand-700);
+}
+:root:not([data-theme="light"]) .op-kpis .kpi,
+:root[data-theme="dark"] .op-kpis .kpi {
+  border-top-color: var(--brand-300);
+}
+.op-kpis .kpi .val { font-size: 21px; }
+.op-kpis .kpi .foot { margin-top: 4px; }
+
+/* Legenda/nota informativa (cabeçalho "Decisões de <dia> · N contratações…") */
+.op-note {
+  display: flex; gap: 9px; align-items: flex-start;
+  background: var(--info-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 13px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;
+}
+.op-note b { color: var(--text-primary); }
+
+/* ---- Faixa de status D7 — Cobertura ---- */
+.cov-note {
+  background: var(--warning-bg); border: 1px solid var(--border); border-left: 3px solid var(--warning);
+  border-radius: 8px; padding: 9px 13px; margin-bottom: 14px; font-size: 11.5px; line-height: 1.5;
+  color: var(--text-secondary);
+}
+.cov-note b { color: var(--text-primary); }
+.cov-note.ok { border-left-color: var(--good); background: var(--good-bg); }
+
+/* ---- Alert card (usado no aviso "Aguardando dado/regra" e no Radar) ---- */
+.alert-card { border-radius: var(--radius-card); padding: 14px 16px; border: 1px solid var(--border); }
+.alert-card h4 {
+  font: 800 12.5px var(--font-manrope), sans-serif; display: flex; align-items: center; gap: 7px;
+  margin-bottom: 8px;
+}
+.alert-card .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.alert-card ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.alert-card li {
+  font-size: 12px; display: flex; justify-content: space-between; gap: 8px;
+  border-top: 1px dashed var(--border); padding-top: 6px;
+}
+.alert-card li:first-child { border-top: none; padding-top: 0; }
+.alert-card .name { color: var(--text-primary); font-weight: 600; }
+.alert-card .num { font-family: var(--font-ibm-plex-mono), monospace; font-weight: 600; white-space: nowrap; }
+.alert-card.info { background: var(--info-bg); }
+.alert-card.info .dot { background: var(--brand-700); }
+.alert-card.info h4 { color: var(--brand-900); }
+
+/* ---- Tabela "Todas as contratações do dia" ---- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.data thead th {
+  position: sticky; top: 0; background: var(--surface-sunken); text-align: left; padding: 8px 10px;
+  font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary); border-bottom: 1px solid var(--border-strong); white-space: nowrap;
+}
+table.data tbody td { padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data tbody tr:nth-child(even) { background: var(--surface-card-alt); }
+table.data tbody tr:hover { background: var(--info-bg); }
+td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
+
+.pill { font: 600 10.5px var(--font-ibm-plex-sans), sans-serif; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+.pill.s { background: var(--good-bg); color: var(--good); }
+.pill.n { background: var(--critical-bg); color: var(--critical); }
+.pill.sc { background: var(--surface-sunken); color: var(--text-muted); }
+
+@media (max-width: 640px) {
+  section.bloc { margin-top: 24px; }
+  .kpi .val { font-size: 21px; }
+}
+
+@media (max-width: 1080px) {
+  .grid.cols2, .grid.cols2-even, .grid.cols3, .grid.cols4 { grid-template-columns: 1fr; }
 }
