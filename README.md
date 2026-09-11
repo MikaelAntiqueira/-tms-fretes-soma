@@ -100,6 +100,11 @@ Variáveis de ambiente necessárias (mesmas na Vercel):
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Project Settings → API, projeto `jpoizkylaffircimxzrq` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | idem — chave publicável (anon), nunca a `service_role` |
 
+## Deploy
+
+Conectado ao projeto Vercel **`tms-fretes-soma`** (time `tms-fretes-soma`) via
+Git — cada push em `main` gera um deploy de produção automaticamente.
+
 ## O que NÃO está neste repositório (de propósito)
 
 - O pipeline Python (`parse_cotacoes.py`, `parse_contratados.py`,
