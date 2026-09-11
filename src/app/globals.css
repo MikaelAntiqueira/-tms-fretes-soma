@@ -504,7 +504,11 @@ section.bloc { margin-top: 34px; }
 .cov-note b { color: var(--text-primary); }
 .cov-note.ok { border-left-color: var(--good); background: var(--good-bg); }
 
-/* ---- Alert card (usado no aviso "Aguardando dado/regra" e no Radar) ---- */
+/* ---- Alert card (usado no aviso "Aguardando dado/regra" e no Radar) ----
+   .crit/.warn portados agora junto com o Radar de Decisão (D2/D3/D4/D6,
+   TASK-29 continuação) — mesmas regras do Artifact original
+   (radarCardHTML: ANOMALIA DE PREÇO = crit; OPORTUNIDADE/RECORRÊNCIA =
+   warn; CONCENTRAÇÃO = info). */
 .alert-card { border-radius: var(--radius-card); padding: 14px 16px; border: 1px solid var(--border); }
 .alert-card h4 {
   font: 800 12.5px var(--font-manrope), sans-serif; display: flex; align-items: center; gap: 7px;
@@ -522,10 +526,17 @@ section.bloc { margin-top: 34px; }
 .alert-card.info { background: var(--info-bg); }
 .alert-card.info .dot { background: var(--brand-700); }
 .alert-card.info h4 { color: var(--brand-900); }
+.alert-card.crit { background: var(--critical-bg); }
+.alert-card.crit .dot { background: var(--critical); }
+.alert-card.crit h4 { color: var(--critical); }
+.alert-card.warn { background: var(--warning-bg); }
+.alert-card.warn .dot { background: var(--warning); }
+.alert-card.warn h4 { color: var(--warning); }
 
-/* ---- Tabela "Todas as contratações do dia" ---- */
+/* ---- Tabela "Todas as contratações do dia" (e drill-down do Radar) ---- */
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.data.compact { min-width: 560px; }
 table.data thead th {
   position: sticky; top: 0; background: var(--surface-sunken); text-align: left; padding: 8px 10px;
   font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em;
@@ -540,6 +551,14 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 .pill.s { background: var(--good-bg); color: var(--good); }
 .pill.n { background: var(--critical-bg); color: var(--critical); }
 .pill.sc { background: var(--surface-sunken); color: var(--text-muted); }
+.pill.azul { background: var(--info-bg); color: var(--brand-700); }
+:root:not([data-theme="light"]) .pill.azul,
+:root[data-theme="dark"] .pill.azul { color: var(--brand-300); }
+.pill.laranja { background: var(--warning-bg); color: var(--warning); }
+
+/* ---- Estado vazio do Radar de Decisão ("dentro do padrão neste dia") ---- */
+.sim-empty { text-align: center; padding: 30px 18px; color: var(--text-muted); font-size: 12.5px; line-height: 1.6; }
+.sim-empty b { color: var(--text-primary); }
 
 @media (max-width: 640px) {
   section.bloc { margin-top: 24px; }

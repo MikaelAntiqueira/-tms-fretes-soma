@@ -4,12 +4,18 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
 // contratação cruzada a uma cotação. Porta, linha a linha, a lógica de
-// `renderOntem()` / `coverageStatus()` do Artifact original (v40) — ver
-// `docs/mapa-migracao-tms-v3-2026-09-11.md` e `memoria/05_DICIONARIO_KPIS.md`
-// (KPI-16, KPI-18/D7). Toda soma/contagem é feita dentro do banco via RPC
-// (`ontem_dia_referencia`, `ontem_kpis`, `ontem_contratacoes`,
-// `ontem_cobertura` — migration `fn_ontem_view_e_funcoes`), nunca somando
-// linhas cruas no cliente.
+// `renderOntem()` / `coverageStatus()` / `radarCards()` do Artifact original
+// (v40/v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md` e
+// `memoria/05_DICIONARIO_KPIS.md` (KPI-16, KPI-18/D7, Radar de Decisão
+// D2/D3/D4/D6). Toda agregação pesada (janelas de 60/30 dias, mediana/IQR
+// por bucket) é feita dentro do banco via RPC (`ontem_dia_referencia`,
+// `ontem_kpis`, `ontem_contratacoes`, `ontem_cobertura` — migration
+// `fn_ontem_view_e_funcoes`; `radar_prazo_hist`, `radar_d2`, `radar_d3`,
+// `radar_d4`, `radar_d6` — migrations `fn_radar_decisao_d2_d3_d4_d6` e
+// `fn_radar_d2_d6_add_drill_columns`), nunca somando/agrupando linhas cruas
+// no cliente. Só o SCORING + DEDUPLICAÇÃO final do Radar (barato — dezenas
+// de candidatos no máximo) roda aqui em TypeScript, replicando literalmente
+// a lógica de `radarCards()`.
 export const dynamic = "force-dynamic";
 
 interface OntemKpis {
@@ -48,11 +54,322 @@ interface OntemCobertura {
   baixa: boolean | null;
 }
 
+// ---- Radar de Decisão (D2/D3/D4/D6) — tipos das RPCs `radar_*` ----
+interface DrillRow {
+  romaneio: string | null;
+  cliente: string | null;
+  transportadora: string | null;
+  frete_contratado: number;
+  melhor_cotacao: number | null;
+  diferenca_r: number | null;
+}
+
+interface RadarD2Row {
+  romaneio: string | null;
+  cidade: string | null;
+  cliente: string | null;
+  transportadora_contratada: string | null;
+  transportadora_barata: string | null;
+  frete_contratado: number;
+  melhor_cotacao: number | null;
+  diferenca_r: number;
+  diferenca_pct: number | null;
+  prazo_contratada: number | null;
+}
+
+interface RadarD3Row {
+  cliente: string | null;
+  cidade: string | null;
+  transportadora_contratada: string | null;
+  n: number;
+  soma: number;
+  moda_transportadora_barata: string | null;
+  moda_vezes: number | null;
+  drill: DrillRow[];
+}
+
+interface RadarD4Row {
+  cidade: string | null;
+  top_transportadora: string | null;
+  n: number;
+  fret: number;
+  share: number;
+  seg2: number | null;
+  drill: DrillRow[];
+}
+
+interface RadarD6Row {
+  romaneio: string | null;
+  cidade: string | null;
+  cliente: string | null;
+  transportadora: string | null;
+  frete_contratado: number;
+  melhor_cotacao: number | null;
+  diferenca_r: number | null;
+  mediana: number;
+  limite: number;
+  bucket_n: number;
+  faixa_peso: string | null;
+  faixa_cubagem: string | null;
+}
+
+type RadarConf = "ALTA" | "MÉDIA" | "BAIXA";
+
+interface RadarCardData {
+  tipo: string;
+  transp: string | null;
+  magNum: number;
+  titulo: string;
+  magTxt: string;
+  evid: string[];
+  regra: string;
+  conf: RadarConf;
+  confMot: string;
+  acao: string;
+  drill: DrillRow[];
+  score?: number;
+}
+
 interface OntemData {
   ref: string | null;
   kpis: OntemKpis | null;
   linhas: OntemLinha[];
   cobertura: OntemCobertura | null;
+  radar: RadarCardData[];
+}
+
+function toDrillRows(arr: unknown): DrillRow[] {
+  return ((arr as Record<string, unknown>[] | null) ?? []).map((d) => ({
+    romaneio: (d.romaneio as string) ?? null,
+    cliente: (d.cliente as string) ?? null,
+    transportadora: (d.transportadora as string) ?? null,
+    frete_contratado: Number(d.frete_contratado ?? 0),
+    melhor_cotacao: d.melhor_cotacao == null ? null : Number(d.melhor_cotacao),
+    diferenca_r: d.diferenca_r == null ? null : Number(d.diferenca_r),
+  }));
+}
+
+// ---- Radar de Decisão: monta os candidatos dos 4 detectores (D2/D3/D4/D6)
+// já agregados pelo banco, e replica literalmente o scoring + deduplicação
+// de `radarCards()` do Artifact original (v40/v42) — ver prompt desta etapa
+// (TASK-29 continuação, 2026-09-11) para a lógica de referência exata,
+// validada card a card contra o Artifact via Playwright para o dia
+// 2026-08-27 (5/5 cards batendo: 2× CONCENTRAÇÃO, 2× RECORRÊNCIA, 1×
+// ANOMALIA DE PREÇO — D2 e o restante de D6 não entraram no top-5 por causa
+// do limite de diversidade, exatamente como no Artifact).
+function buildRadarCards(
+  d2: RadarD2Row[],
+  d3: RadarD3Row[],
+  d4: RadarD4Row[],
+  d6: RadarD6Row[],
+  prazoHist: Map<string, number | null>
+): RadarCardData[] {
+  const cand: RadarCardData[] = [];
+
+  // ---- D2 — Oportunidade a verificar ----
+  for (const r of d2) {
+    const pr = r.prazo_contratada;
+    const ph = r.transportadora_barata ? prazoHist.get(r.transportadora_barata) ?? null : null;
+    const prazoOk = pr != null && ph != null && ph <= pr;
+    const phTxt = ph != null ? (Number.isInteger(ph) ? String(ph) : fmtNum(ph, 1)) : "";
+    const prazoTxt =
+      pr != null && ph != null
+        ? prazoOk
+          ? `prazo da alternativa ~${phTxt}d (histórico) ≤ ${pr}d da contratada`
+          : `prazo da alternativa ~${phTxt}d > ${pr}d da contratada — pode ser troca por prazo`
+        : "prazo não comparável nesta linha";
+    cand.push({
+      tipo: "OPORTUNIDADE A VERIFICAR",
+      transp: r.transportadora_contratada,
+      magNum: r.diferenca_r,
+      titulo: `Rom. ${r.romaneio ?? "—"} · ${r.cidade ?? "—"}`,
+      magTxt: `+${fmtBRL(r.diferenca_r)} · ${fmtPct(r.diferenca_pct)}`,
+      evid: [
+        `contratou ${r.transportadora_contratada ?? "—"}; ${r.transportadora_barata} cotou mais barato o mesmo romaneio`,
+        prazoTxt,
+        "prestação de serviço: não informada nos dados",
+      ],
+      regra: 'esc="N" ∧ diferença>0 ∧ alternativa cotou o mesmo romaneio',
+      conf: prazoOk ? "MÉDIA" : "BAIXA",
+      confMot:
+        pr != null && ph != null
+          ? "prazo por proxy (mediana histórica); prestação ausente"
+          : "sem prazo comparável e sem prestação",
+      acao: "Investigar",
+      drill: [
+        {
+          romaneio: r.romaneio,
+          cliente: r.cliente,
+          transportadora: r.transportadora_contratada,
+          frete_contratado: r.frete_contratado,
+          melhor_cotacao: r.melhor_cotacao,
+          diferenca_r: r.diferenca_r,
+        },
+      ],
+    });
+  }
+
+  // ---- D3 — Recorrência ----
+  for (const r of d3) {
+    cand.push({
+      tipo: "RECORRÊNCIA",
+      transp: r.transportadora_contratada,
+      magNum: r.soma,
+      titulo: `${r.cidade ?? "—"} · ${r.cliente ?? "—"}`.slice(0, 60),
+      magTxt: `${r.n}× · ${fmtBRL(r.soma)} acumulado (60 dias)`,
+      evid: [
+        `${r.n} contratações acima da alternativa, sempre ${r.transportadora_contratada}`,
+        r.moda_transportadora_barata
+          ? `alternativa mais frequente nas cotações: ${r.moda_transportadora_barata} (${r.moda_vezes ?? 0}×)`
+          : "sem alternativa recorrente clara",
+      ],
+      regra: 'mesmo (cliente, cidade, transportadora) com esc="N" ≥ 8× em 60 dias',
+      conf: "ALTA",
+      confMot: 'é contagem factual; "é oportunidade" ainda depende de prazo/prestação',
+      acao: "Renegociar",
+      drill: r.drill,
+    });
+  }
+
+  // ---- D4 — Concentração ----
+  for (const r of d4) {
+    cand.push({
+      tipo: "CONCENTRAÇÃO",
+      transp: r.top_transportadora,
+      magNum: r.share * r.fret,
+      titulo: `${r.cidade ?? "—"} · ${r.top_transportadora ?? "—"}`,
+      magTxt: `${fmtPct(r.share)} das ${r.n} contratações (30 dias)`,
+      evid: [
+        `${r.top_transportadora ?? "—"} = ${fmtPct(r.share)}; 2ª colocada = ${r.seg2 ? fmtPct(r.seg2) : "—"}`,
+        `frete da cidade no período: ${fmtBRL(r.fret)}`,
+      ],
+      regra: "cidade com ≥ 10 contratações, ≥ 2 transportadoras já usadas e 1 delas ≥ 80% (30 dias)",
+      conf: "ALTA",
+      confMot: "factual; não afirma risco — é para avaliar se há 2ª opção viável",
+      acao: "Avaliar concentração",
+      drill: r.drill,
+    });
+  }
+
+  // ---- D6 — Anomalia de preço ----
+  for (const r of d6) {
+    cand.push({
+      tipo: "ANOMALIA DE PREÇO",
+      transp: r.transportadora,
+      magNum: r.frete_contratado - r.mediana,
+      titulo: `Rom. ${r.romaneio ?? "—"} · ${r.cidade ?? "—"}`,
+      magTxt: `${fmtBRL(r.frete_contratado)} vs. mediana ${fmtBRL(r.mediana)}`,
+      evid: [
+        `${r.transportadora ?? "—"} em ${r.faixa_peso ?? "—"} / ${r.faixa_cubagem ?? "—"} (base de ${r.bucket_n} operações)`,
+        `acima de mediana + 3× IQR (${fmtBRL(r.limite)})`,
+      ],
+      regra: "freteC > mediana + 3·IQR da mesma transportadora e faixa (amostra ≥ 30)",
+      conf: "MÉDIA",
+      confMot: "pode ser carga atípica legítima — conferir NF / valor declarado",
+      acao: "Investigar",
+      drill: [
+        {
+          romaneio: r.romaneio,
+          cliente: r.cliente,
+          transportadora: r.transportadora,
+          frete_contratado: r.frete_contratado,
+          melhor_cotacao: r.melhor_cotacao,
+          diferenca_r: r.diferenca_r,
+        },
+      ],
+    });
+  }
+
+  // ---- Scoring + diversidade (idêntico ao Artifact: no máx. 2 do mesmo
+  // tipo, 2 da mesma transportadora, 5 no total) ----
+  const maxMag = Math.max(1, ...cand.map((c) => c.magNum || 0));
+  cand.forEach((c) => {
+    const w = c.conf === "ALTA" ? 1 : c.conf === "MÉDIA" ? 0.6 : 0.3;
+    c.score = ((c.magNum || 0) / maxMag) * w;
+  });
+  cand.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const seenT: Record<string, number> = {};
+  const seenTr: Record<string, number> = {};
+  const out: RadarCardData[] = [];
+  for (const c of cand) {
+    const kt = c.tipo;
+    const kr = c.transp || "-";
+    if ((seenT[kt] || 0) >= 2 || (seenTr[kr] || 0) >= 2) continue;
+    seenT[kt] = (seenT[kt] || 0) + 1;
+    seenTr[kr] = (seenTr[kr] || 0) + 1;
+    out.push(c);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+async function getRadarData(ref: string): Promise<RadarCardData[]> {
+  const [prazoRes, d2Res, d3Res, d4Res, d6Res] = await Promise.all([
+    supabase.rpc("radar_prazo_hist"),
+    supabase.rpc("radar_d2", { p_dia: ref }),
+    supabase.rpc("radar_d3", { p_dia: ref }),
+    supabase.rpc("radar_d4", { p_dia: ref }),
+    supabase.rpc("radar_d6", { p_dia: ref }),
+  ]);
+  for (const res of [prazoRes, d2Res, d3Res, d4Res, d6Res]) {
+    if (res.error) throw new Error(res.error.message);
+  }
+
+  const prazoHist = new Map<string, number | null>();
+  for (const r of (prazoRes.data as Record<string, unknown>[]) ?? []) {
+    prazoHist.set(r.transportadora as string, r.mediana == null ? null : Number(r.mediana));
+  }
+
+  const d2: RadarD2Row[] = ((d2Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    romaneio: (r.romaneio as string) ?? null,
+    cidade: (r.cidade as string) ?? null,
+    cliente: (r.cliente as string) ?? null,
+    transportadora_contratada: (r.transportadora_contratada as string) ?? null,
+    transportadora_barata: (r.transportadora_barata as string) ?? null,
+    frete_contratado: Number(r.frete_contratado ?? 0),
+    melhor_cotacao: r.melhor_cotacao == null ? null : Number(r.melhor_cotacao),
+    diferenca_r: Number(r.diferenca_r ?? 0),
+    diferenca_pct: r.diferenca_pct == null ? null : Number(r.diferenca_pct),
+    prazo_contratada: r.prazo_contratada == null ? null : Number(r.prazo_contratada),
+  }));
+
+  const d3: RadarD3Row[] = ((d3Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    cliente: (r.cliente as string) ?? null,
+    cidade: (r.cidade as string) ?? null,
+    transportadora_contratada: (r.transportadora_contratada as string) ?? null,
+    n: Number(r.n ?? 0),
+    soma: Number(r.soma ?? 0),
+    moda_transportadora_barata: (r.moda_transportadora_barata as string) ?? null,
+    moda_vezes: r.moda_vezes == null ? null : Number(r.moda_vezes),
+    drill: toDrillRows(r.drill),
+  }));
+
+  const d4: RadarD4Row[] = ((d4Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    cidade: (r.cidade as string) ?? null,
+    top_transportadora: (r.top_transportadora as string) ?? null,
+    n: Number(r.n ?? 0),
+    fret: Number(r.fret ?? 0),
+    share: Number(r.share ?? 0),
+    seg2: r.seg2 == null ? null : Number(r.seg2),
+    drill: toDrillRows(r.drill),
+  }));
+
+  const d6: RadarD6Row[] = ((d6Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    romaneio: (r.romaneio as string) ?? null,
+    cidade: (r.cidade as string) ?? null,
+    cliente: (r.cliente as string) ?? null,
+    transportadora: (r.transportadora as string) ?? null,
+    frete_contratado: Number(r.frete_contratado ?? 0),
+    melhor_cotacao: r.melhor_cotacao == null ? null : Number(r.melhor_cotacao),
+    diferenca_r: r.diferenca_r == null ? null : Number(r.diferenca_r),
+    mediana: Number(r.mediana ?? 0),
+    limite: Number(r.limite ?? 0),
+    bucket_n: Number(r.bucket_n ?? 0),
+    faixa_peso: (r.faixa_peso as string) ?? null,
+    faixa_cubagem: (r.faixa_cubagem as string) ?? null,
+  }));
+
+  return buildRadarCards(d2, d3, d4, d6, prazoHist);
 }
 
 async function getOntemData(): Promise<OntemData> {
@@ -61,13 +378,14 @@ async function getOntemData(): Promise<OntemData> {
   const ref = (refRes.data as string | null) ?? null;
 
   if (!ref) {
-    return { ref: null, kpis: null, linhas: [], cobertura: null };
+    return { ref: null, kpis: null, linhas: [], cobertura: null, radar: [] };
   }
 
-  const [kpisRes, linhasRes, coberturaRes] = await Promise.all([
+  const [kpisRes, linhasRes, coberturaRes, radar] = await Promise.all([
     supabase.rpc("ontem_kpis", { p_dia: ref }),
     supabase.rpc("ontem_contratacoes", { p_dia: ref }),
     supabase.rpc("ontem_cobertura", { p_dia: ref }),
+    getRadarData(ref),
   ]);
   for (const res of [kpisRes, linhasRes, coberturaRes]) {
     if (res.error) throw new Error(res.error.message);
@@ -116,7 +434,7 @@ async function getOntemData(): Promise<OntemData> {
       }
     : null;
 
-  return { ref, kpis, linhas, cobertura };
+  return { ref, kpis, linhas, cobertura, radar };
 }
 
 // ---- formatação — reproduz fmtBRL/fmtPct/fmtNum/fmtDate do Artifact original
@@ -169,9 +487,104 @@ function CoberturaNote({ c }: { c: OntemCobertura | null }) {
   return (
     <div
       className={`cov-note${baixa ? "" : " ok"}`}
-      style={{ margin: 0 }}
+      style={{ margin: 0, marginBottom: 14 }}
       dangerouslySetInnerHTML={{ __html: (baixa ? "⚠ " : "✓ ") + txt }}
     />
+  );
+}
+
+// ---- Radar de Decisão: renderização do card — porta `radarCardHTML()` do
+// Artifact original 1:1 (mesmo mapeamento tipo → classe CSS/pill). ----
+function radarCls(tipo: string): "crit" | "warn" | "info" {
+  if (tipo === "ANOMALIA DE PREÇO") return "crit";
+  if (tipo.startsWith("OPORTUNIDADE") || tipo === "RECORRÊNCIA") return "warn";
+  return "info";
+}
+function radarPill(cls: "crit" | "warn" | "info"): "n" | "laranja" | "azul" {
+  return cls === "crit" ? "n" : cls === "warn" ? "laranja" : "azul";
+}
+
+function RadarCardView({ c }: { c: RadarCardData }) {
+  const cls = radarCls(c.tipo);
+  const pill = radarPill(cls);
+  return (
+    <div className={`alert-card ${cls}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <h4 style={{ justifyContent: "space-between", width: "100%" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+          <span className="dot" />
+          {c.tipo}
+        </span>
+        <span className={`pill ${pill}`}>{c.acao}</span>
+      </h4>
+      <div style={{ fontFamily: "var(--font-manrope)", fontWeight: 800, fontSize: 13, color: "var(--text-primary)" }}>
+        {c.titulo}
+      </div>
+      <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+        {c.magTxt}
+      </div>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+          fontSize: 11.5,
+          color: "var(--text-secondary)",
+        }}
+      >
+        {c.evid.map((e, i) => (
+          <li key={i}>• {e}</li>
+        ))}
+      </ul>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: "var(--text-muted)",
+          borderTop: "1px dashed var(--border)",
+          paddingTop: 6,
+          lineHeight: 1.5,
+        }}
+      >
+        Regra: {c.regra}
+        <br />
+        Confiabilidade: <b>{c.conf}</b> — {c.confMot}
+      </div>
+      {c.drill.length > 0 && (
+        <details style={{ fontSize: 11 }}>
+          <summary style={{ cursor: "pointer", color: "var(--brand-700)", fontWeight: 600 }}>
+            ver {c.drill.length} operação(ões)
+          </summary>
+          <div className="table-scroll" style={{ marginTop: 6 }}>
+            <table className="data compact">
+              <thead>
+                <tr>
+                  <th>Rom.</th>
+                  <th>Cliente</th>
+                  <th>Transp.</th>
+                  <th className="num">Frete</th>
+                  <th className="num">Menor</th>
+                  <th className="num">Dif R$</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.drill.map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.romaneio ?? "—"}</td>
+                    <td>{d.cliente ?? "—"}</td>
+                    <td>{d.transportadora ?? "—"}</td>
+                    <td className="num">{fmtBRL(d.frete_contratado)}</td>
+                    <td className="num">{fmtBRL(d.melhor_cotacao)}</td>
+                    <td className="num">{d.diferenca_r == null ? "—" : fmtBRL(d.diferenca_r)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -188,6 +601,7 @@ export default async function OntemPage() {
   const ref = data?.ref ?? null;
   const linhas = data?.linhas ?? [];
   const cobertura = data?.cobertura ?? null;
+  const radarCardsList = data?.radar ?? [];
 
   const pctBarata =
     kpis && kpis.n_escolheu_sim + kpis.n_escolheu_nao > 0
@@ -275,15 +689,26 @@ export default async function OntemPage() {
                 </div>
               </div>
               <CoberturaNote c={cobertura} />
-              <div className="card">
-                <h3>Detectores D2/D3/D4/D6 — pendente nesta etapa</h3>
-                <div className="sub">
-                  Oportunidade a verificar, Recorrência, Concentração e Anomalia de Preço dependem de
-                  janelas históricas (60/30 dias), faixas de peso/cubagem e prazo histórico por
-                  transportadora que ainda não foram portados com a mesma fidelidade da tabela acima —
-                  ver relatório desta etapa. A faixa de cobertura (D7) acima já está ativa.
+              {radarCardsList.length === 0 ? (
+                <div className="sim-empty">
+                  <b>Operação dentro do padrão neste dia.</b>
+                  <br />
+                  nenhuma situação passou dos limiares do Radar.
                 </div>
-                <div className="alert-card info">
+              ) : (
+                <div className="grid cols-auto">
+                  {radarCardsList.map((c, i) => (
+                    <RadarCardView c={c} key={i} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="bloc">
+              <div className="card">
+                <h3>Aguardando dado / regra</h3>
+                <div className="sub">detectores que ligam quando a informação chegar da gestão / do TMS</div>
+                <div className="alert-card info" style={{ marginTop: 8 }}>
                   <ul>
                     <li>
                       <span className="name">Oportunidade objetiva (prazo + prestação iguais)</span>
