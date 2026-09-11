@@ -568,3 +568,87 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 @media (max-width: 1080px) {
   .grid.cols2, .grid.cols2-even, .grid.cols3, .grid.cols4 { grid-template-columns: 1fr; }
 }
+
+/* ==========================================================================
+   Página "Operação" (Controle Operacional de Carregamento) — [TASK-29].
+   Classes novas (não existiam no CSS portado até aqui): barra de
+   distribuição de frete por transportadora, bolinha de cor por
+   transportadora, e a barra de participação por transportadora dentro dos
+   mini-cards Meio-dia/Tarde. Valores de espaçamento/raio seguem os mesmos
+   tokens já usados em .card/.pill/.cov-note acima — não é uma linguagem
+   visual nova. Reutilizadas por src/app/operacao/page.tsx.
+   ========================================================================== */
+
+/* ---- bolinha de cor por transportadora (paleta --t1..--t7) ---- */
+.carrier-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* ---- barra de distribuição de frete por transportadora ---- */
+.dist-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+.dist-bar span { height: 100%; }
+
+.dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+.dist-legend .item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---- mini-cards Meio-dia x Tarde: 1 linha por transportadora com barra de
+   participação % dentro do balde ---- */
+.window-carrier-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+.window-carrier-row .name {
+  flex: 0 0 128px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.window-carrier-row .bar {
+  flex: 1;
+  height: 8px;
+  min-width: 40px;
+  border-radius: 99px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+  display: block;
+}
+.window-carrier-row .bar span { height: 100%; display: block; }
+.window-carrier-row .pct {
+  flex: 0 0 44px;
+  text-align: right;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .window-carrier-row .name { flex-basis: 96px; }
+}
