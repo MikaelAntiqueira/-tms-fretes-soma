@@ -1,1 +1,726 @@
-__FILE__
+@import "tailwindcss";
+
+/* ==========================================================================
+   TOKENS DE IDENTIDADE VISUAL — portados do Artifact "Fretes Cotado x
+   Contratado" (c0abf79e-..., v39), Etapa 1.1 do mapa de migração.
+   Valores lidos direto do CSS publicado — NÃO são aproximação.
+   Preservar 1:1 (R-PRESERVAR / mapa de migração, Etapa 3: "identidade visual
+   pixel-a-pixel"). Qualquer ajuste de paleta precisa de decisão explícita,
+   não é "melhoria" livre.
+   ========================================================================== */
+:root {
+  --surface-page: #eef3f6;
+  --surface-card: #ffffff;
+  --surface-card-alt: #f5f9fb;
+  --surface-sunken: #e7eef2;
+  --text-primary: #0d2436;
+  --text-secondary: #4f758e;
+  --text-muted: #7f97a6;
+  --border: rgba(13, 36, 54, 0.12);
+  --border-strong: rgba(13, 36, 54, 0.22);
+
+  --brand-900: #005285;
+  --brand-700: #088cb3;
+  --brand-500: #329dbb;
+  --brand-300: #5fb0c5;
+  --brand-slate: #4f758e;
+  --accent: #088cb3;
+  --accent-ink: #ffffff;
+  --focus: #005285;
+
+  --good: #0ca30c;
+  --warning: #c98500;
+  --serious: #c9612f;
+  --critical: #d03b3b;
+  --good-bg: rgba(12, 163, 12, 0.1);
+  --warning-bg: rgba(201, 133, 0, 0.1);
+  --serious-bg: rgba(201, 97, 47, 0.1);
+  --critical-bg: rgba(208, 59, 59, 0.1);
+  --info-bg: rgba(8, 140, 179, 0.09);
+
+  /* Paleta categórica (gráficos/séries) */
+  --t1: #2a78d6;
+  --t2: #eb6834;
+  --t3: #1baf7a;
+  --t4: #c98500;
+  --t5: #e0629a;
+  --t6: #1a8f1a;
+  --t7: #4a3aa7;
+
+  --shadow-card: 0 1px 2px rgba(13, 36, 54, 0.06), 0 8px 24px -12px rgba(13, 36, 54, 0.14);
+  --radius-card: 14px;
+  --radius-sm: 8px;
+  color-scheme: light;
+}
+
+/* Dark mode automático (prefers-color-scheme), a menos que o usuário force
+   claro via data-theme="light" */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-page: #0b1b26;
+    --surface-card: #122333;
+    --surface-card-alt: #0f2836;
+    --surface-sunken: #0a1a24;
+    --text-primary: #eef6fa;
+    --text-secondary: #9fc1d6;
+    --text-muted: #6f93a8;
+    --border: rgba(214, 235, 247, 0.12);
+    --border-strong: rgba(214, 235, 247, 0.22);
+    --brand-900: #3fa6dc;
+    --brand-700: #4fc0e8;
+    --brand-500: #5fb0c5;
+    --brand-300: #7fc4d6;
+    --accent: #4fc0e8;
+    --accent-ink: #04212f;
+    --focus: #7fc4d6;
+    --good: #3fcf5a;
+    --warning: #f0b429;
+    --serious: #f0895c;
+    --critical: #f2695f;
+    --good-bg: rgba(63, 207, 90, 0.14);
+    --warning-bg: rgba(240, 180, 41, 0.14);
+    --serious-bg: rgba(240, 137, 92, 0.14);
+    --critical-bg: rgba(242, 105, 95, 0.14);
+    --info-bg: rgba(79, 192, 232, 0.12);
+    --t1: #5b9fe8;
+    --t2: #f08a5e;
+    --t3: #3ecf9a;
+    --t4: #e0a83f;
+    --t5: #ee88b3;
+    --t6: #4fc25f;
+    --t7: #8f7fe0;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+
+/* Dark mode manual (independe do SO) — controlado pelo ThemeToggle */
+:root[data-theme="dark"] {
+  --surface-page: #0b1b26;
+  --surface-card: #122333;
+  --surface-card-alt: #0f2836;
+  --surface-sunken: #0a1a24;
+  --text-primary: #eef6fa;
+  --text-secondary: #9fc1d6;
+  --text-muted: #6f93a8;
+  --border: rgba(214, 235, 247, 0.12);
+  --border-strong: rgba(214, 235, 247, 0.22);
+  --brand-900: #3fa6dc;
+  --brand-700: #4fc0e8;
+  --brand-500: #5fb0c5;
+  --brand-300: #7fc4d6;
+  --accent: #4fc0e8;
+  --accent-ink: #04212f;
+  --focus: #7fc4d6;
+  --good: #3fcf5a;
+  --warning: #f0b429;
+  --serious: #f0895c;
+  --critical: #f2695f;
+  --good-bg: rgba(63, 207, 90, 0.14);
+  --warning-bg: rgba(240, 180, 41, 0.14);
+  --serious-bg: rgba(240, 137, 92, 0.14);
+  --critical-bg: rgba(242, 105, 95, 0.14);
+  --info-bg: rgba(79, 192, 232, 0.12);
+  --t1: #5b9fe8;
+  --t2: #f08a5e;
+  --t3: #3ecf9a;
+  --t4: #e0a83f;
+  --t5: #ee88b3;
+  --t6: #4fc25f;
+  --t7: #8f7fe0;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* Liga os tokens acima às utilities do Tailwind v4 (bg-surface-card,
+   text-brand-700, etc.) sem duplicar valores. */
+@theme inline {
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-card-alt: var(--surface-card-alt);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-brand-900: var(--brand-900);
+  --color-brand-700: var(--brand-700);
+  --color-brand-500: var(--brand-500);
+  --color-brand-300: var(--brand-300);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --color-good-bg: var(--good-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-serious-bg: var(--serious-bg);
+  --color-critical-bg: var(--critical-bg);
+  --color-info-bg: var(--info-bg);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-t5: var(--t5);
+  --color-t6: var(--t6);
+  --color-t7: var(--t7);
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-heading: var(--font-manrope);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-ibm-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  margin: 0;
+}
+
+.mono {
+  font-family: var(--font-ibm-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--brand-700);
+}
+
+::selection {
+  background: var(--brand-300);
+  color: #04212f;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Componentes da página de prova de conceito (Fase 5 — esqueleto).
+   Deliberadamente simples: o dashboard completo (16 gráficos, 5 páginas,
+   motor de filtro) é portado em fases seguintes, uma peça de cada vez.
+   ========================================================================== */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: linear-gradient(150deg, var(--brand-900), var(--brand-700) 65%, var(--brand-500));
+  color: #fff;
+  padding: 28px 24px;
+}
+
+.app-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  font: 600 11px/1 var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.app-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 6px 0 4px;
+  color: #fff;
+}
+
+.app-header p {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 58ch;
+  margin: 0;
+}
+
+.app-header nav.crumbs {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.app-header nav.crumbs a {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 600;
+}
+.app-header nav.crumbs a:hover {
+  text-decoration: underline;
+}
+
+main.content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  width: 100%;
+  flex: 1;
+}
+
+main.content.wide {
+  max-width: 1320px;
+}
+
+.section-label {
+  font: 700 11px var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.kpi-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpi-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+
+.kpi-card .lbl {
+  font: 700 11px var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.kpi-card .val {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 6px;
+  letter-spacing: -0.01em;
+}
+
+.kpi-card .note {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.kpi-card .badge {
+  display: inline-block;
+  font: 700 9.5px var(--font-ibm-plex-mono), monospace;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+  background: var(--info-bg);
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+}
+
+.status-banner {
+  margin-top: 24px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: var(--good-bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--good);
+  color: var(--text-secondary);
+}
+
+.status-banner.erro {
+  background: var(--critical-bg);
+  border-left-color: var(--critical);
+}
+
+.status-banner b {
+  color: var(--text-primary);
+}
+
+.provisorio-note {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  background: var(--warning-bg);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.provisorio-note b {
+  color: var(--text-primary);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.theme-toggle button {
+  all: unset;
+  cursor: pointer;
+  font: 600 11px var(--font-ibm-plex-sans), sans-serif;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 5px 10px;
+  border-radius: 99px;
+}
+
+.theme-toggle button.on {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--brand-900);
+}
+
+footer.app-footer {
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+footer.app-footer a {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Página "Ontem" (D-1) — classes portadas 1:1 do Artifact original
+   (c0abf79e-..., v40), Fase 5 do mapa de migração. Valores lidos direto do
+   CSS publicado (mesmas regras, mesmos tokens) — não é uma reinterpretação
+   visual. Reutilizadas por src/app/ontem/page.tsx.
+   ========================================================================== */
+section.bloc { margin-top: 34px; }
+
+.bloc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.bloc-head h2 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.bloc-head .desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.grid { display: grid; gap: 14px; }
+.grid > * { min-width: 0; }
+.grid.cols-auto { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+.card h3 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.card .sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
+
+/* ---- KPI tiles ---- */
+.kpi { display: flex; flex-direction: column; gap: 6px; min-height: 118px; position: relative; }
+.kpi .lbl {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--text-secondary); text-transform: uppercase;
+}
+.kpi .val {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 25px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;
+}
+.kpi .val small { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.kpi .foot { font-size: 11px; color: var(--text-muted); margin-top: auto; }
+
+/* Página "Ontem": os KPIs do topo, mesmo tratamento visual do Controle
+   Operacional no Artifact original (borda superior de destaque). */
+.op-kpis { grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); }
+.op-kpis .kpi {
+  min-height: 96px; padding: 14px 16px; gap: 4px;
+  border-top: 2px solid var(--brand-700);
+}
+:root:not([data-theme="light"]) .op-kpis .kpi,
+:root[data-theme="dark"] .op-kpis .kpi {
+  border-top-color: var(--brand-300);
+}
+.op-kpis .kpi .val { font-size: 21px; }
+.op-kpis .kpi .foot { margin-top: 4px; }
+
+/* Legenda/nota informativa (cabeçalho "Decisões de <dia> · N contratações…") */
+.op-note {
+  display: flex; gap: 9px; align-items: flex-start;
+  background: var(--info-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 13px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;
+}
+.op-note b { color: var(--text-primary); }
+
+/* ---- Faixa de status D7 — Cobertura ---- */
+.cov-note {
+  background: var(--warning-bg); border: 1px solid var(--border); border-left: 3px solid var(--warning);
+  border-radius: 8px; padding: 9px 13px; margin-bottom: 14px; font-size: 11.5px; line-height: 1.5;
+  color: var(--text-secondary);
+}
+.cov-note b { color: var(--text-primary); }
+.cov-note.ok { border-left-color: var(--good); background: var(--good-bg); }
+
+/* ---- Alert card (usado no aviso "Aguardando dado/regra" e no Radar) ----
+   .crit/.warn portados agora junto com o Radar de Decisão (D2/D3/D4/D6,
+   TASK-29 continuação) — mesmas regras do Artifact original
+   (radarCardHTML: ANOMALIA DE PREÇO = crit; OPORTUNIDADE/RECORRÊNCIA =
+   warn; CONCENTRAÇÃO = info). */
+.alert-card { border-radius: var(--radius-card); padding: 14px 16px; border: 1px solid var(--border); }
+.alert-card h4 {
+  font: 800 12.5px var(--font-manrope), sans-serif; display: flex; align-items: center; gap: 7px;
+  margin-bottom: 8px;
+}
+.alert-card .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.alert-card ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.alert-card li {
+  font-size: 12px; display: flex; justify-content: space-between; gap: 8px;
+  border-top: 1px dashed var(--border); padding-top: 6px;
+}
+.alert-card li:first-child { border-top: none; padding-top: 0; }
+.alert-card .name { color: var(--text-primary); font-weight: 600; }
+.alert-card .num { font-family: var(--font-ibm-plex-mono), monospace; font-weight: 600; white-space: nowrap; }
+.alert-card.info { background: var(--info-bg); }
+.alert-card.info .dot { background: var(--brand-700); }
+.alert-card.info h4 { color: var(--brand-900); }
+.alert-card.crit { background: var(--critical-bg); }
+.alert-card.crit .dot { background: var(--critical); }
+.alert-card.crit h4 { color: var(--critical); }
+.alert-card.warn { background: var(--warning-bg); }
+.alert-card.warn .dot { background: var(--warning); }
+.alert-card.warn h4 { color: var(--warning); }
+
+/* ---- Tabela "Todas as contratações do dia" (e drill-down do Radar) ---- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.data.compact { min-width: 560px; }
+table.data thead th {
+  position: sticky; top: 0; background: var(--surface-sunken); text-align: left; padding: 8px 10px;
+  font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary); border-bottom: 1px solid var(--border-strong); white-space: nowrap;
+}
+table.data tbody td { padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data tbody tr:nth-child(even) { background: var(--surface-card-alt); }
+table.data tbody tr:hover { background: var(--info-bg); }
+td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
+
+.pill { font: 600 10.5px var(--font-ibm-plex-sans), sans-serif; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+.pill.s { background: var(--good-bg); color: var(--good); }
+.pill.n { background: var(--critical-bg); color: var(--critical); }
+.pill.sc { background: var(--surface-sunken); color: var(--text-muted); }
+.pill.azul { background: var(--info-bg); color: var(--brand-700); }
+:root:not([data-theme="light"]) .pill.azul,
+:root[data-theme="dark"] .pill.azul { color: var(--brand-300); }
+.pill.laranja { background: var(--warning-bg); color: var(--warning); }
+
+/* ---- Estado vazio do Radar de Decisão ("dentro do padrão neste dia") ---- */
+.sim-empty { text-align: center; padding: 30px 18px; color: var(--text-muted); font-size: 12.5px; line-height: 1.6; }
+.sim-empty b { color: var(--text-primary); }
+
+@media (max-width: 640px) {
+  section.bloc { margin-top: 24px; }
+  .kpi .val { font-size: 21px; }
+}
+
+@media (max-width: 1080px) {
+  .grid.cols2, .grid.cols2-even, .grid.cols3, .grid.cols4 { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   Página "Operação" (Controle Operacional de Carregamento) — [TASK-29].
+   Classes novas (não existiam no CSS portado até aqui): barra de
+   distribuição de frete por transportadora, bolinha de cor por
+   transportadora, e a barra de participação por transportadora dentro dos
+   mini-cards Meio-dia/Tarde. Valores de espaçamento/raio seguem os mesmos
+   tokens já usados em .card/.pill/.cov-note acima — não é uma linguagem
+   visual nova. Reutilizadas por src/app/operacao/page.tsx.
+   ========================================================================== */
+
+/* ---- bolinha de cor por transportadora (paleta --t1..--t7) ---- */
+.carrier-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* ---- barra de distribuição de frete por transportadora ---- */
+.dist-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+.dist-bar span { height: 100%; }
+
+.dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+.dist-legend .item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---- mini-cards Meio-dia x Tarde: 1 linha por transportadora com barra de
+   participação % dentro do balde ---- */
+.window-carrier-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+.window-carrier-row .name {
+  flex: 0 0 128px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.window-carrier-row .bar {
+  flex: 1;
+  height: 8px;
+  min-width: 40px;
+  border-radius: 99px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+  display: block;
+}
+.window-carrier-row .bar span { height: 100%; display: block; }
+.window-carrier-row .pct {
+  flex: 0 0 44px;
+  text-align: right;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .window-carrier-row .name { flex-basis: 96px; }
+}
+
+/* ==========================================================================
+   Página "Financeiro" (Visão Geral) — [TASK-29] continuação. Classes
+   portadas 1:1 do Artifact original (c0abf79e-..., v42): grid de 8 KPIs
+   executivos (`.grid.kpis`), pílula "sem comparação" dos KPIs (`.kpi
+   .delta*`), tile N/D (`.kpi.nd`) e o card do resumo executivo
+   (`.exec-card`). Valores lidos direto do CSS publicado, não são
+   aproximação. `.grid.cols2-even` já tinha a regra mobile (@1080px)
+   portada junto com a página "Ontem" — faltava só a base (2 colunas
+   iguais), usada agora pelos mini-cards Meio-dia/Tarde desta página.
+   Reutilizadas por src/app/financeiro/page.tsx.
+   ========================================================================== */
+.grid.cols2-even { grid-template-columns: 1fr 1fr; }
+
+.grid.kpis { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1080px) {
+  .grid.kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 360px) {
+  /* Telas muito estreitas: 2 colunas de KPI não cabem sem cortar o valor
+     monetário — cai para 1 coluna só aqui (mesma regra do Artifact). */
+  .grid.kpis { grid-template-columns: 1fr; }
+}
+
+.kpi .delta {
+  font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;
+  width: fit-content; padding: 2px 7px; border-radius: 99px;
+}
+.kpi .delta.up { color: var(--critical); background: var(--critical-bg); }
+.kpi .delta.down { color: var(--good); background: var(--good-bg); }
+.kpi .delta.flat { color: var(--text-muted); background: var(--surface-sunken); }
+.kpi .delta.na { color: var(--text-muted); font-weight: 500; }
+.kpi.nd .val { color: var(--text-muted); font-size: 16px; font-weight: 600; }
+
+/* ---- resumo executivo ---- */
+.exec-card {
+  background: linear-gradient(155deg, var(--brand-900), var(--brand-700));
+  color: #fff;
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-card);
+}
+.exec-card h3 { color: #fff; font-size: 14px; }
+.exec-card p { margin: 10px 0 0; font-size: 13.5px; line-height: 1.65; color: rgba(255, 255, 255, 0.94); }
+.exec-card p + p { margin-top: 9px; }
+.exec-card b { color: #fff; }
+
+/* ==========================================================================
+   Página "Financeiro" — sub-abas ([TASK-29] continuação, 2026-09-11/12,
+   sub-aba "Cotado × Contratado"). Classes portadas 1:1 do Artifact original
+   (c0abf79e-..., v42) — `.subnav`/`.subpage` (mecanismo E1.3 de abas
+   internas dentro da mesma página-mãe) e a base de `.grid.cols2` que faltava
+   (só a regra de colapso @1080px de `.grid.cols2` já tinha sido portada
+   junto com a página "Ontem" — a base de 2 colunas nunca tinha sido
+   adicionada, porque nenhuma página até agora precisava dela; `.grid.cols2-
+   even` acima é uma classe diferente, 1fr 1fr, usada só nos mini-cards
+   Meio-dia/Tarde). Valores lidos direto do CSS publicado. Reutilizadas por
+   src/app/financeiro/page.tsx (e por qualquer página futura que ganhe
+   sub-abas, ex. Transportadoras & Cidades).
+   ========================================================================== */
+.grid.cols2 { grid-template-columns: 1.3fr 1fr; }
+
+.subnav { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin: 0 0 18px; }
+.subnav button {
+  font: 600 12.5px var(--font-ibm-plex-sans), sans-serif; padding: 9px 14px; border: 0; background: none;
+  color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; border-radius: 6px 6px 0 0;
+}
+.subnav button:hover { color: var(--text-primary); background: var(--surface-card-alt); }
+.subnav button.active { color: var(--brand-700); border-bottom-color: var(--brand-700); }
+:root:not([data-theme="light"]) .subnav button.active,
+:root[data-theme="dark"] .subnav button.active { color: var(--brand-300); border-bottom-color: var(--brand-300); }
+.subpage[hidden] { display: none !important; }
