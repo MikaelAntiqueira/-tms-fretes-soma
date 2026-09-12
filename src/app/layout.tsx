@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { DashboardShell } from "@/components/DashboardShell";
 import "./globals.css";
 
 // Tipografia portada 1:1 do Artifact atual (Etapa 1.1 do mapa de migração):
@@ -39,7 +40,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${manrope.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        {/* Menu lateral fixo unificando a navegação — [TASK-29] continuação
+            (2026-09-12). Ver src/components/DashboardShell.tsx. */}
+        <DashboardShell>{children}</DashboardShell>
+      </body>
     </html>
   );
 }
