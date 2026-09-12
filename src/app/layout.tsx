@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { DashboardShell } from "@/components/DashboardShell";
+import { SidebarStats } from "@/components/SidebarStats";
 import "./globals.css";
 
 // Tipografia portada 1:1 do Artifact atual (Etapa 1.1 do mapa de migração):
@@ -42,8 +43,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body>
         {/* Menu lateral fixo unificando a navegação — [TASK-29] continuação
-            (2026-09-12). Ver src/components/DashboardShell.tsx. */}
-        <DashboardShell>{children}</DashboardShell>
+            (2026-09-12). Ver src/components/DashboardShell.tsx.
+            `stats` = badges/metadados do cabeçalho do Artifact original,
+            buscados no Supabase por um Server Component (SidebarStats) e
+            passados como slot pro client component. */}
+        <DashboardShell stats={<SidebarStats />}>{children}</DashboardShell>
       </body>
     </html>
   );

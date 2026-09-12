@@ -116,7 +116,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({ children, stats }: { children: ReactNode; stats?: ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -126,14 +126,23 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <nav className={`sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
         <div className="sidebar-brand">
           {/* Logo "Grupo SOMA Hospitalar" — portada do header do Artifact
-              original (estava faltando em todo o Next.js, apontado pelo
-              Mikael). Ver src/components/soma-logo.ts. */}
+              original (estava faltando em todo o Next.js até esta etapa,
+              apontado pelo Mikael). Ver src/components/soma-logo.ts. */}
           <img className="sidebar-brand-logo" src={SOMA_LOGO_DATA_URI} alt="Grupo SOMA Hospitalar" />
           <span className="sidebar-brand-text">
             <span className="sidebar-brand-title">TMS FRETES</span>
             <span className="sidebar-brand-sub">Gestão &amp; Inteligência</span>
           </span>
         </div>
+
+        {/* Badges + metadados do cabeçalho do Artifact original
+            (<header class="top">/#hdrBadges/#hdrLastDate) — [TASK-29]
+            continuação, 2026-09-12. `stats` vem de src/app/layout.tsx como
+            <SidebarStats /> (Server Component que consulta o Supabase),
+            passado por slot/prop porque este componente é "use client" e
+            não pode fazer `await` direto. Ver src/components/SidebarStats.tsx
+            para a decisão de design do rótulo "Atualizado em". */}
+        {stats}
 
         <div className="sidebar-nav">
           {NAV_ITEMS.map((item) => {
