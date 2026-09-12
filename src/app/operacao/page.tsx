@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Página "Operação" (Controle Operacional de Carregamento), rota /operacao.
@@ -94,6 +94,7 @@ interface OperacaoData {
 }
 
 async function getOperacaoData(): Promise<OperacaoData> {
+  const supabase = await createSupabaseServerClient();
   const [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes] = await Promise.all([
     supabase.rpc("operacao_kpis"),
     supabase.rpc("operacao_por_transportadora"),
