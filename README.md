@@ -46,14 +46,15 @@ de conexão:
 
 ## Aviso importante — policy de leitura temporária no Supabase
 
-RLS (Row Level Security) está habilitada em todas as tabelas, mas **ainda não
-existem policies reais de admin/user** — isso é trabalho da Fase 6
-(Supabase Auth + perfis). Para este esqueleto conseguir ler dados sem esperar
-a Fase 6, foi aplicada uma **policy temporária e explícita de leitura pública**
-nas 5 tabelas de fato:
+RLS (Row Level Security) está habilitada em todas as tabelas. Para as 5
+tabelas de dado (`clientes`, `transportadoras`, `cotacoes`, `ofertas`,
+`contratacoes`) existe uma **policy temporária e explícita de leitura
+pública**:
 
 ```sql
--- PROVISÓRIO — remover/substituir na Fase 6
+-- PROVISÓRIO — só o Mikael decide quando remover/substituir, ver seção
+-- "Supabase Auth" abaixo (Fase 6 construiu a infraestrutura de login AO
+-- LADO desta policy, sem removê-la).
 create policy "leitura publica temporaria" on public.cotacoes for select using (true);
 create policy "leitura publica temporaria" on public.ofertas for select using (true);
 create policy "leitura publica temporaria" on public.contratacoes for select using (true);
@@ -64,9 +65,42 @@ create policy "leitura publica temporaria" on public.transportadoras for select 
 Aplicada via migration `policy_leitura_publica_temporaria_v3_scaffold` no
 projeto Supabase `jpoizkylaffircimxzrq` (tms-fretes-soma). **Não é a política
 final de segurança do projeto** — qualquer pessoa com a URL do Supabase e a
-chave publicável (anon) hoje consegue ler (não escrever) essas 5 tabelas. A
-Fase 6 substitui isso por policies reais baseadas em Supabase Auth + tabela
-`profiles` (admin/user). Não remover este aviso até a Fase 6 estar feita.
+chave publicável (anon) hoje consegue ler (não escrever) essas 5 tabelas.
+Removê-la é uma decisão FUTURA e deliberada do Mikael (ele está usando o site
+publicamente agora) — não uma consequência automática de ter Auth pronto.
+
+## Supabase Auth ([TASK-29] Fase 6 — infraestrutura, 2026-09-12)
+
+Infraestrutura de login construída **ao lado** do acesso público acima, sem
+substituí-lo:
+
+- **Admin inicial**: `mikaelantiqueira@gmail.com` ([DEC-29]), convidado pelo
+  painel do Supabase Auth — a senha é definida por ele mesmo no primeiro
+  acesso (link de convite/recuperação), nunca hardcoded neste repositório.
+- **`@supabase/ssr`** (pacote oficial recomendado pelo Supabase para o App
+  Router) foi adicionado em arquivos NOVOS — `src/lib/supabase-browser.ts`
+  (Client Components: login, indicador de sessão) e
+  `src/lib/supabase-server.ts` (Server Components/Route Handlers, ainda sem
+  consumidor). O cliente compartilhado existente, `src/lib/supabase.ts`
+  (`@supabase/supabase-js` simples, usado por `.rpc(...)` em todas as
+  páginas), **não foi trocado** — ver a nota no topo desse arquivo.
+- **`/login`** (`src/app/login/page.tsx`): formulário de e-mail/senha
+  (`supabase.auth.signInWithPassword`), redireciona para `/` depois de
+  logar. Visitar essa página é opcional.
+- **Indicador de sessão**: rodapé da sidebar (`SessionIndicator`, dentro de
+  `DashboardShell.tsx`) mostra "Visitante" sem sessão, ou o e-mail + botão
+  "Sair" com sessão ativa — puramente informativo, não bloqueia nada.
+- **Sem middleware nesta etapa** — decisão deliberada, não esquecida.
+  Redirecionar visitantes para `/login` só faz sentido depois que as
+  policies públicas acima forem removidas (decisão futura do Mikael); fazer
+  isso agora quebraria o acesso público em uso.
+- **`profiles`**: um trigger (`handle_new_user`, migration
+  `auth_fase6_profile_provisioning_e_importacoes_policy`) cria
+  automaticamente a linha em `public.profiles` quando um usuário aparece em
+  `auth.users` — `role='admin'` só para o e-mail acima, `role='user'` para
+  qualquer outro. `public.importacoes` (RLS habilitada, sem nenhuma policy
+  até então — ninguém conseguia escrever) ganhou uma policy nova de escrita
+  só para admin autenticado; nenhuma policy pública existente foi tocada.
 
 ## Stack e decisões técnicas desta etapa
 
@@ -112,7 +146,8 @@ Git — cada push em `main` gera um deploy de produção automaticamente.
   migração é incremental, os dois sistemas rodam em paralelo até a Fase 9
   (validação) ser aprovada.
 - O Artifact HTML/Chart.js atual continua no ar, sem mudanças.
-- Autenticação, perfis (admin/user) e a área administrativa de importação —
-  Fases 6 e 7.
-- Os 16 gráficos, o motor de filtro (`state → mask → render`) e as 5 páginas
-  do dashboard — Fase 5, próximos commits.
+- Middleware de proteção de rota (redirecionar visitante pra `/login`) — só
+  depois que as policies públicas temporárias forem removidas, decisão
+  futura do Mikael (ver seção "Supabase Auth" acima).
+- A área administrativa de importação (usar a policy nova de `importacoes`
+  para de fato subir um arquivo) — fase futura.

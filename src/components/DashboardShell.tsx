@@ -20,10 +20,20 @@
 // sidebar (`.with-sidebar`, classe nova, não reaproveita `.app-shell`: essa
 // já é usada dentro de cada page.tsx com um significado diferente — flex
 // column simples, sem offset — pra não colidir as duas definições de CSS).
+//
+// Indicador de sessão ([TASK-29] Fase 6 — Supabase Auth, 2026-09-12):
+// <SessionIndicator /> adicionado no rodapé da sidebar, dentro de
+// <nav>, depois de `.sidebar-nav` — componente isolado (ver
+// src/components/SessionIndicator.tsx) para manter esta edição mínima,
+// já que este arquivo também pode ser tocado por outro fluxo de trabalho em
+// paralelo (motor de filtro global). Puramente informativo: "Visitante" sem
+// sessão, e-mail + "Sair" com sessão ativa — não bloqueia nem redireciona
+// ninguém.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { SOMA_LOGO_DATA_URI } from "./soma-logo";
+import { SessionIndicator } from "./SessionIndicator";
 
 interface NavItem {
   href: string;
@@ -169,6 +179,10 @@ export function DashboardShell({ children, stats }: { children: ReactNode; stats
             );
           })}
         </div>
+
+        {/* Indicador de sessão (Supabase Auth, [TASK-29] Fase 6) — ver
+            comentário no topo do arquivo. */}
+        <SessionIndicator />
       </nav>
 
       <button
