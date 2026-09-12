@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ComparativoCharts } from "./ComparativoCharts";
 import { TransportadorasTabs } from "./TransportadorasTabs";
@@ -161,6 +161,7 @@ interface TransportadorasData {
 }
 
 async function getTransportadorasData(): Promise<TransportadorasData> {
+  const supabase = await createSupabaseServerClient();
   const [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes] = await Promise.all([
     supabase.rpc("transportadoras_comparativo"),
     supabase.rpc("transportadoras_prazo_medio"),
