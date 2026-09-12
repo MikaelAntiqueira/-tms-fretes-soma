@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Página sempre busca dado fresco — é só uma prova de conceito de conexão
@@ -13,6 +13,7 @@ interface Kpis {
 }
 
 async function getKpis(): Promise<Kpis> {
+  const supabase = await createSupabaseServerClient();
   const [cotacoesRes, contratacoesRes, cruzadasRes, somaRes] = await Promise.all([
     // FATO — total de sessões de cotação (Enviado↔Recebido casados por chave estável).
     supabase.from("cotacoes").select("*", { count: "exact", head: true }),
