@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { FinanceiroTabs } from "./FinanceiroTabs";
@@ -144,6 +144,13 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // inteira) — é uma limitação de FONTE (a maior parte das contratações
 // nunca teve uma cotação para cruzar), não uma métrica que dependa do
 // recorte do usuário. Ver comentário completo na migration.
+//
+// [TASK-29] Fase 6 (Supabase Auth, 2026-09-12) — usa createSupabaseServerClient()
+// (cookie-aware) em vez do cliente compartilhado sem sessão: as policies de
+// leitura foram restritas a `authenticated`, e todas as RPCs abaixo precisam
+// do JWT do usuário logado para não virem vazias (ver commit em
+// src/app/page.tsx). Não altera nada do motor de filtro global (Fase 1)
+// documentado acima.
 export const dynamic = "force-dynamic";
 
 interface FinanceiroKpis {
@@ -288,6 +295,7 @@ interface FiltrosVisaoGeral {
 const TRANSP_ORDER = ["Fritz Express", "LKW", "Leomar", "Minuano", "Rede Nacional", "Santa Cruz", "São Miguel"];
 
 async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<FinanceiroData> {
+  const supabase = await createSupabaseServerClient();
   const filtroArgs = {
     p_meses: filtros.meses,
     p_transportadoras: filtros.transportadoras,
