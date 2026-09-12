@@ -1,7 +1,8 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { FinanceiroTabs } from "./FinanceiroTabs";
 import { CotadoContratadoCharts } from "./CotadoContratadoCharts";
 import { PadroesCharts } from "./PadroesCharts";
@@ -68,9 +69,7 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // "Cotado × Contratado" foram validados do mesmo jeito. Os 4 gráficos de
 // "Padrões da Diferença" e os 2 gráficos + outliers + tabela de cubagem de
 // "Peso, Cubagem & Custo" foram validados por raciocínio linha a linha
-// sobre a lógica replicada (o filtro global ainda não existe no Next.js,
-// então o "recorte atual" é sempre a base inteira comparável — igual ao
-// estado inicial sem filtro do Artifact) + conferência cruzada de total:
+// sobre a lógica replicada + conferência cruzada de total:
 // `financeiro_cubagem_custo()` soma R$ 494.417,43 de frete contratado
 // (5.194 processos) — o MESMO total já validado em `financeiro_visao_geral_
 // kpis().frete_total` (ver ISSUE de paginação do PostgREST, `06_LOG_
@@ -81,6 +80,70 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // da página): a "Simulação de Custo por Transportadora" (4º bloco da
 // Visão Geral original) — regra "nunca estima, sempre real, operação a
 // operação" merece validação própria, com mais tempo.
+//
+// ============================================================================
+// [TASK-29] MOTOR DE FILTRO GLOBAL — FASE 1 (2026-09-12). Página piloto.
+// ============================================================================
+// Esta é a PRIMEIRA página do Next.js a ganhar o motor de filtro global do
+// Artifact original (11 dropdowns multi-seleção que recalculam tudo ao
+// vivo — `MSEL_KEYS`, HTML de referência linha ~1216). Escopo desta Fase 1,
+// deliberadamente pequeno (ver spec completa em `src/components/
+// FilterBar.tsx`, que documenta o motor genérico):
+//
+//   - SÓ 4 das 11 dimensões: Mês, Transportadora Contratada, Região
+//     Comercial (`clientes.regiao_normalizada`, JÁ normalizada — [DEC-02]
+//     FINAL) e Tipo Cliente. AINDA FALTAM: romaneio, esc (escolheu a mais
+//     barata), prazo, cidade, janela, faixaPeso, faixaCubagem — próximas
+//     etapas, não bug desta rodada.
+//   - SÓ a sub-aba "Visão Geral" reage aos filtros (KPIs executivos,
+//     Meio-dia × Tarde, Resumo executivo). "Cotado × Contratado", "Padrões
+//     da Diferença" e "Peso, Cubagem & Custo" continuam mostrando SEMPRE a
+//     base completa, sem filtro algum — próxima etapa natural desta
+//     migração, não esquecimento.
+//   - SEM cascata de opções: as 4 listas de opções (meses/transportadoras/
+//     regiões/tipos) são sempre a lista COMPLETA de valores possíveis na
+//     base inteira, nunca podada pelos outros filtros ativos — ver
+//     FilterBar.tsx para o racional completo.
+//
+// Estado do filtro: URL search params (`?mes=...&transportadora=...&
+// regiao=...&tipo=...`, multi-valor separado por vírgula), NUNCA
+// useState/Context client-side efêmero — Server Components leem
+// `searchParams` nativamente (sem round-trip extra) e a URL fica
+// compartilhável/copiável e sobrevive a um F5 (o Artifact original perdia o
+// filtro ao recarregar a página, só estado em memória JS). Ausência de um
+// parâmetro = "todos" (sem filtro nessa dimensão) — mesma semântica do
+// Artifact (Set vazio = todos, nunca "zero resultados").
+//
+// Convenção SQL (documentada por completo na migration
+// `fn_filtro_global_fase1_visao_geral`): as 4 functions que a Visão Geral
+// usa ganharam 4 parâmetros novos, todos `default null` (aditivos, nunca
+// quebram quem já chama sem eles — validado com regressão zero, ver
+// relatório desta tarefa): `financeiro_visao_geral_kpis`, `financeiro_
+// visao_geral_resumo` (só esta página as chama) e `operacao_por_janela` +
+// `transportadoras_comparativo` (REAPROVEITADAS de /operacao e
+// /transportadoras — parâmetros opcionais adicionados na function
+// ORIGINAL, não duplicada, porque `/operacao` e `/transportadoras`
+// continuam chamando sem argumentos e recebem exatamente os mesmos números
+// de sempre).
+//
+// ATENÇÃO — pegadinha real encontrada e corrigida nesta etapa: `create or
+// replace function` com uma assinatura DIFERENTE (parâmetros novos) cria um
+// OVERLOAD em vez de substituir a function. Como os 4 parâmetros novos têm
+// `default null`, a versão nova também aceita ser chamada com ZERO
+// argumentos — isso deixou, por um instante, DUAS versões de cada function
+// (a antiga sem parâmetros + a nova com 4 parâmetros default null), e uma
+// chamada sem argumentos ficou AMBÍGUA ("function ... is not unique"),
+// quebrando temporariamente /operacao e /transportadoras. Corrigido
+// removendo a assinatura antiga (`drop function ... ()`) logo em seguida —
+// migration `fn_filtro_global_fase1_remove_overloads_zero_arg`. Lição para
+// quem tocar essas functions de novo: nunca deixe 2 overloads coexistindo.
+//
+// Nota sobre a "cobertura estrutural" (covNote, mais abaixo): os campos
+// `total_contratacoes`/`contratacoes_cruzadas` de `financeiro_visao_geral_
+// kpis()` são DELIBERADAMENTE não afetados pelo filtro (sempre a base
+// inteira) — é uma limitação de FONTE (a maior parte das contratações
+// nunca teve uma cotação para cruzar), não uma métrica que dependa do
+// recorte do usuário. Ver comentário completo na migration.
 export const dynamic = "force-dynamic";
 
 interface FinanceiroKpis {
@@ -202,14 +265,42 @@ interface FinanceiroData {
   cubagemCusto: CubagemCustoRow[];
   custoKgGeral: number | null;
   custoM3Geral: number | null;
+  opcoesRegioes: string[];
+  opcoesTipos: string[];
 }
 
-async function getFinanceiroData(): Promise<FinanceiroData> {
+// Filtros da Fase 1 do motor de filtro global (só os 4 já suportados —
+// ver comentário no topo do arquivo). `null` numa dimensão = sem filtro
+// nela (mesma convenção das functions SQL, default null = "todos").
+interface FiltrosVisaoGeral {
+  meses: string[] | null;
+  transportadoras: string[] | null;
+  regioes: string[] | null;
+  tipos: string[] | null;
+}
+
+// Lista fixa das 7 transportadoras, MESMA ordem usada em `transportadoras_
+// comparativo()` (cláusula `VALUES` da function) e no `TRANSP_ORDER` do
+// Artifact original — opções do dropdown "Transportadora Contratada" do
+// FilterBar. Não é uma query nova: evita ida ao banco só para listar 7
+// valores fixos e conhecidos (mesma decisão já usada em CARRIER_COLOR de
+// /operacao e /transportadoras).
+const TRANSP_ORDER = ["Fritz Express", "LKW", "Leomar", "Minuano", "Rede Nacional", "Santa Cruz", "São Miguel"];
+
+async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<FinanceiroData> {
+  const filtroArgs = {
+    p_meses: filtros.meses,
+    p_transportadoras: filtros.transportadoras,
+    p_regioes: filtros.regioes,
+    p_tipos: filtros.tipos,
+  };
+
   const [
     kpisRes,
     resumoRes,
     janelasRes,
     transpRes,
+    opcoesRes,
     evolucaoRes,
     diffNRes,
     diffPrazoRes,
@@ -221,10 +312,14 @@ async function getFinanceiroData(): Promise<FinanceiroData> {
     prazoFreteRes,
     cubagemRes,
   ] = await Promise.all([
-    supabase.rpc("financeiro_visao_geral_kpis"),
-    supabase.rpc("financeiro_visao_geral_resumo"),
-    supabase.rpc("operacao_por_janela"),
-    supabase.rpc("transportadoras_comparativo"),
+    // ---- as 4 RPCs que a sub-aba "Visão Geral" usa: reagem ao filtro ----
+    supabase.rpc("financeiro_visao_geral_kpis", filtroArgs),
+    supabase.rpc("financeiro_visao_geral_resumo", filtroArgs),
+    supabase.rpc("operacao_por_janela", filtroArgs),
+    supabase.rpc("transportadoras_comparativo", filtroArgs),
+    // ---- opções completas (sem cascata) para os dropdowns Região/Tipo ----
+    supabase.rpc("financeiro_filtro_opcoes"),
+    // ---- demais sub-abas: FORA do escopo desta Fase 1, sempre base completa ----
     supabase.rpc("financeiro_evolucao_mensal"),
     supabase.rpc("financeiro_diff_n_esc_nao"),
     supabase.rpc("financeiro_diff_por_prazo"),
@@ -241,6 +336,7 @@ async function getFinanceiroData(): Promise<FinanceiroData> {
     resumoRes,
     janelasRes,
     transpRes,
+    opcoesRes,
     evolucaoRes,
     diffNRes,
     diffPrazoRes,
@@ -305,6 +401,10 @@ async function getFinanceiroData(): Promise<FinanceiroData> {
         pct_mais_barata: topRow.pct_mais_barata == null ? null : Number(topRow.pct_mais_barata),
       }
     : null;
+
+  const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+  const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
+  const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
 
   const evolucaoRows = (evolucaoRes.data as Record<string, unknown>[]) ?? [];
   const evolucaoMensal: EvolucaoMesRow[] = evolucaoRows.map((r) => ({
@@ -397,6 +497,8 @@ async function getFinanceiroData(): Promise<FinanceiroData> {
     cubagemCusto,
     custoKgGeral,
     custoM3Geral,
+    opcoesRegioes,
+    opcoesTipos,
   };
 }
 
@@ -424,11 +526,39 @@ function fmtMes(iso: string): string {
   return `${nomes[idx] ?? "?"}/${y}`;
 }
 
-export default async function FinanceiroPage() {
+// Lê um parâmetro de URL no formato "valor1,valor2" e devolve a lista de
+// valores (trim + descarta vazios), ou `null` se o parâmetro não veio —
+// `null` é a convenção de "sem filtro nessa dimensão" usada em toda a
+// cadeia (URL -> page.tsx -> RPC -> SQL, default null = todos).
+function parseMulti(raw: string | string[] | undefined): string[] | null {
+  if (!raw) return null;
+  const joined = Array.isArray(raw) ? raw.join(",") : raw;
+  const values = joined
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return values.length > 0 ? values : null;
+}
+
+type FinanceiroSearchParams = Record<string, string | string[] | undefined>;
+
+export default async function FinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<FinanceiroSearchParams>;
+}) {
+  const sp = await searchParams;
+  const filtros: FiltrosVisaoGeral = {
+    meses: parseMulti(sp.mes),
+    transportadoras: parseMulti(sp.transportadora),
+    regioes: parseMulti(sp.regiao),
+    tipos: parseMulti(sp.tipo),
+  };
+
   let data: FinanceiroData | null = null;
   let erro: string | null = null;
   try {
-    data = await getFinanceiroData();
+    data = await getFinanceiroData(filtros);
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
@@ -452,6 +582,21 @@ export default async function FinanceiroPage() {
   const cubagemCusto = data?.cubagemCusto ?? [];
   const custoKgGeral = data?.custoKgGeral ?? null;
   const custoM3Geral = data?.custoM3Geral ?? null;
+  const opcoesRegioes = data?.opcoesRegioes ?? [];
+  const opcoesTipos = data?.opcoesTipos ?? [];
+
+  // Opções do dropdown "Mês": todos os meses presentes na base (mesma lista
+  // que `financeiro_evolucao_mensal()` já devolve, sem filtro nenhum — não
+  // é uma query nova, só reaproveita o que a página já busca para a sub-aba
+  // "Cotado × Contratado").
+  const mesesDisponiveis = [...new Set(evolucaoMensal.map((r) => r.mes))].sort();
+
+  const filterDimensions: FilterDimension[] = [
+    { param: "mes", labelAll: "Todos os meses", options: mesesDisponiveis, format: fmtMes },
+    { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
+    { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
+    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+  ];
 
   const pctBarata = k && k.escS + k.escN > 0 ? k.escS / (k.escS + k.escN) : null;
   const pctSobreContratado = k && k.freteTotal ? k.diffPosSum / k.freteTotal : null;
@@ -543,7 +688,8 @@ export default async function FinanceiroPage() {
       <b>FATO — cobertura:</b> estes números cobrem ~1/3 da operação — {fmtNum(k.contratacoesCruzadas)}{" "}
       fretes contratados cruzam uma cotação ({fmtPct(pctComparavel)} comparáveis); os demais{" "}
       {pctNaoCruzada == null ? "—" : `~${fmtPct(pctNaoCruzada, 0)}`} ainda não têm cotação registrada
-      para comparar. Limitação de fonte, não de método.
+      para comparar. Limitação de fonte, não de método. Estes 2 números de cobertura não mudam com o
+      filtro acima (são sempre a base inteira — ver comentário no topo do código desta página).
     </div>
   ) : null;
 
@@ -555,8 +701,10 @@ export default async function FinanceiroPage() {
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Financeiro</h1>
             <p>
-              KPIs executivos, evolução mensal e decisões de contratação — agregado sobre{" "}
-              <b>toda a base de cotações</b> (sem filtro de período nesta etapa da migração).
+              KPIs executivos, evolução mensal e decisões de contratação. A sub-aba <b>Visão Geral</b>{" "}
+              já aceita os filtros de Mês, Transportadora Contratada, Região Comercial e Tipo Cliente
+              (Fase 1 do motor de filtro global); as demais 3 sub-abas ainda mostram sempre a base
+              completa, sem filtro.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
@@ -574,7 +722,7 @@ export default async function FinanceiroPage() {
             <div style={{ marginTop: 6 }}>{erro}</div>
           </div>
         ) : !k ? (
-          <div className="status-banner">Sem dados na base atual.</div>
+          <div className="status-banner">Sem dados na base atual (confira se o filtro ativo não zerou o recorte).</div>
         ) : (
           <FinanceiroTabs
             tabs={[
@@ -586,6 +734,17 @@ export default async function FinanceiroPage() {
             defaultTab="fin-visao"
           >
             <div className="subpage" data-subpage="fin-visao">
+              {/* Motor de filtro global — Fase 1. Escopo/limitações completos
+                  no comentário do topo deste arquivo e em FilterBar.tsx. Fica
+                  só dentro desta sub-aba de propósito: é a única que reage ao
+                  filtro nesta etapa — colocá-lo fora daqui (ex. acima das
+                  abas) sugeriria que "Cotado × Contratado"/"Padrões da
+                  Diferença"/"Peso, Cubagem & Custo" também reagem, o que
+                  ainda não é verdade. */}
+              <Suspense fallback={<div className="filterbar" />}>
+                <FilterBar dimensions={filterDimensions} />
+              </Suspense>
+
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>KPIs executivos</h2>
@@ -729,7 +888,7 @@ export default async function FinanceiroPage() {
               <section className="bloc">
                 <div className="card">
                   <h3>Pendências desta etapa</h3>
-                  <div className="sub">4º bloco da Visão Geral original</div>
+                  <div className="sub">4º bloco da Visão Geral original + próximas etapas do motor de filtro</div>
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
                       <li>
@@ -737,6 +896,27 @@ export default async function FinanceiroPage() {
                         <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
                           fora de propósito nesta etapa — regra &quot;nunca estima, sempre real, operação a
                           operação&quot; merece validação própria, com mais tempo
+                        </span>
+                      </li>
+                      <li>
+                        <span className="name">Motor de filtro — 7 dimensões restantes</span>
+                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                          romaneio, escolheu a mais barata, prazo, cidade, janela, faixa de peso, faixa de
+                          cubagem — Fase 1 trouxe só Mês/Transportadora/Região/Tipo (ver FilterBar.tsx)
+                        </span>
+                      </li>
+                      <li>
+                        <span className="name">Motor de filtro — cascata de opções</span>
+                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                          os dropdowns ainda mostram sempre a lista completa de valores, não podada pelos
+                          outros filtros ativos (ver FilterBar.tsx)
+                        </span>
+                      </li>
+                      <li>
+                        <span className="name">Motor de filtro — demais sub-abas/páginas</span>
+                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                          &quot;Cotado × Contratado&quot;/&quot;Padrões da Diferença&quot;/&quot;Peso, Cubagem
+                          &amp; Custo&quot; e as demais 4 páginas do dashboard ainda não reagem ao filtro
                         </span>
                       </li>
                     </ul>
@@ -749,7 +929,10 @@ export default async function FinanceiroPage() {
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>Evolução financeira mensal</h2>
-                  <div className="desc">Frete contratado x melhor cotação disponível · diferença financeira identificada por mês</div>
+                  <div className="desc">
+                    Frete contratado x melhor cotação disponível · diferença financeira identificada por mês ·
+                    base completa, ainda não reage ao filtro acima (ver Pendências na Visão Geral)
+                  </div>
                 </div>
                 {covNote}
                 <CotadoContratadoCharts
@@ -770,7 +953,7 @@ export default async function FinanceiroPage() {
                   <h2>Padrões da diferença financeira</h2>
                   <div className="desc">
                     Onde a diferença financeira se concentra — diferença observada, não erro nem economia perdida; a
-                    correlação não confirma motivo
+                    correlação não confirma motivo. Base completa, ainda não reage ao filtro da Visão Geral.
                   </div>
                 </div>
                 <PadroesCharts
@@ -787,7 +970,10 @@ export default async function FinanceiroPage() {
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>Peso, Cubagem &amp; Custo</h2>
-                  <div className="desc">Relação entre peso, cubagem, prazo contratado e valor do frete</div>
+                  <div className="desc">
+                    Relação entre peso, cubagem, prazo contratado e valor do frete · base completa, ainda não
+                    reage ao filtro da Visão Geral
+                  </div>
                 </div>
                 <PesoCustoCharts pesoBins={pesoBins} prazoRows={prazoFrete} />
 
