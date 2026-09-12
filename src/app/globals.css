@@ -891,3 +891,113 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
      usuário abre o menu (comportamento aceitável, documentado no pedido). */
   .sidebar.collapsed .sidebar-stats { display: flex; }
 }
+
+/* ==========================================================================
+   Página de Login + indicador de sessão na sidebar — infraestrutura de
+   Supabase Auth ([TASK-29] Fase 6, 2026-09-12). Bloco 100% ADITIVO: nenhuma
+   classe existente acima foi alterada. Usa os tokens de cor já definidos no
+   topo deste arquivo e a classe `.card` já existente (mesma linguagem
+   visual das páginas "Ontem"/"Operação") — não inventa uma nova
+   identidade visual para o formulário. Ver src/app/login/page.tsx e
+   src/components/SessionIndicator.tsx (renderizado dentro da sidebar por
+   src/components/DashboardShell.tsx).
+   ========================================================================== */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h1 {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.login-card .sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.login-form { display: flex; flex-direction: column; gap: 14px; }
+
+.form-field { display: flex; flex-direction: column; gap: 6px; }
+.form-field label {
+  font: 700 11px var(--font-ibm-plex-sans), sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.form-field input {
+  font: 500 13.5px var(--font-ibm-plex-sans), sans-serif;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card-alt);
+  color: var(--text-primary);
+}
+.form-field input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.form-submit-btn {
+  font: 700 13px var(--font-ibm-plex-sans), sans-serif;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--brand-700);
+  color: #fff;
+  cursor: pointer;
+}
+.form-submit-btn:hover { background: var(--brand-900); }
+.form-submit-btn:disabled { opacity: 0.6; cursor: default; }
+
+.login-note {
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ---- indicador de sessão no rodapé da sidebar ---- */
+.sidebar-session {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  flex: none;
+}
+.sidebar-session .who {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-session .who strong { color: var(--text-primary); font-weight: 700; }
+.sidebar-session .link-btn {
+  all: unset;
+  cursor: pointer;
+  color: var(--brand-700);
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.sidebar-session .link-btn:hover { text-decoration: underline; }
+.sidebar.collapsed .sidebar-session { display: none; }
+
+@media (max-width: 900px) {
+  /* Mesma regra de .sidebar-stats acima: sidebar vira overlay em mobile —
+     "collapsed" ali significa "mostrar tudo", não "recolhida". */
+  .sidebar.collapsed .sidebar-session { display: flex; }
+}
