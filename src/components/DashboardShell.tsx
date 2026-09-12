@@ -23,6 +23,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { SOMA_LOGO_DATA_URI } from "./soma-logo";
 
 interface NavItem {
   href: string;
@@ -124,15 +125,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     <>
       <nav className={`sidebar${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <span className="sidebar-brand-icon">
-            <svg viewBox="0 0 24 24" {...ICON_STROKE}>
-              <path d="M3 16V7a1 1 0 0 1 1-1h9v10" />
-              <path d="M13 10h4l3 3v3h-2" />
-              <circle cx="7.5" cy="17.5" r="1.8" />
-              <circle cx="17.5" cy="17.5" r="1.8" />
-              <path d="M9.3 17.5h6.4" />
-            </svg>
-          </span>
+          {/* Logo "Grupo SOMA Hospitalar" — portada do header do Artifact
+              original (estava faltando em todo o Next.js, apontado pelo
+              Mikael). Ver src/components/soma-logo.ts. */}
+          <img className="sidebar-brand-logo" src={SOMA_LOGO_DATA_URI} alt="Grupo SOMA Hospitalar" />
           <span className="sidebar-brand-text">
             <span className="sidebar-brand-title">TMS FRETES</span>
             <span className="sidebar-brand-sub">Gestão &amp; Inteligência</span>
