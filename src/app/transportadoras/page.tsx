@@ -2,32 +2,58 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ComparativoCharts } from "./ComparativoCharts";
+import { TransportadorasTabs } from "./TransportadorasTabs";
+import { RegiaoComercialChart, type RegiaoComercialRow } from "./RegiaoComercialChart";
+import { ClientesChart, type ClienteMetricaRow } from "./ClientesChart";
 
-// Página "Transportadoras & Cidades" — SÓ a sub-aba "Comparativo" nesta
-// etapa (TASK-29 continuação, 2026-09-11), rota /transportadoras. Porta,
-// linha a linha, `function renderTransportadoras(mask, qmask)` do Artifact
-// original (v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md`,
-// `memoria/04_DICIONARIO_DADOS.md` e `memoria/05_DICIONARIO_KPIS.md`
-// ([KPI-08]/[KPI-15], [DEC-15] FINAL — "% Mais Barata" é uma distribuição,
-// não desempenho absoluto isolado).
+// Página "Transportadoras & Cidades" — sub-abas "Comparativo" (TASK-29
+// continuação, 2026-09-11, inalterada nesta etapa), "Região Comercial" e
+// "Clientes" (novas, TASK-29 continuação, 2026-09-12), rota /transportadoras.
+// Porta, linha a linha, `function renderTransportadoras(mask, qmask)`
+// (Comparativo), `function renderUf(mask)` (Região Comercial) e `function
+// renderClientes(mask)` (Clientes) do Artifact original (v42) — ver
+// `docs/mapa-migracao-tms-v3-2026-09-11.md`, `memoria/04_DICIONARIO_DADOS.md`
+// e `memoria/05_DICIONARIO_KPIS.md` ([KPI-08]/[KPI-15], [DEC-15] FINAL —
+// "% Mais Barata" é uma distribuição, não desempenho absoluto isolado;
+// [DEC-02] FINAL — Região Comercial ≠ UF, usa sempre
+// `clientes.regiao_normalizada`, nunca `regiao_comercial_bruta`).
 //
-// É comparação FACTUAL entre transportadoras (cotada × contratada × mais
-// barata) — de propósito, SEM nenhuma classificação de oportunidade/risco
-// (essa camada fica fora, ver `07_PROBLEMAS_ABERTOS.md` → [ISSUE-23]).
+// Comparativo é comparação FACTUAL entre transportadoras (cotada ×
+// contratada × mais barata) — de propósito, SEM nenhuma classificação de
+// oportunidade/risco (essa camada fica fora, ver `07_PROBLEMAS_ABERTOS.md`
+// → [ISSUE-23]). Região Comercial e Clientes seguem a mesma postura: só
+// agregação factual de valor contratado / diferença financeira
+// identificada / contagem de processos, sem classificar causa.
 //
-// Toda agregação é feita dentro do banco via RPC `transportadoras_comparativo`
-// (migrations `fn_transportadoras_comparativo` +
-// `fix_transportadoras_comparativo_qtdcotada_e_maisbarata`), nunca somando
-// linhas cruas no cliente — são ~21.836 ofertas e ~5.194 contratações
-// cruzadas, acima do limite padrão de 1000 linhas/requisição do PostgREST.
+// Toda agregação é feita dentro do banco via RPC (`transportadoras_
+// comparativo`, `transportadoras_regiao_comercial`, `transportadoras_
+// clientes_metricas` — migrations `fn_transportadoras_comparativo` +
+// `fix_transportadoras_comparativo_qtdcotada_e_maisbarata` +
+// `fn_transportadoras_regiao_comercial_e_clientes`), nunca somando linhas
+// cruas no cliente — são ~21.836 ofertas, ~6.915 cotações e ~5.194
+// contratações cruzadas, acima do limite padrão de 1000 linhas/requisição
+// do PostgREST.
 //
-// Validado campo a campo (Playwright) contra a tabela #tblTransp do Artifact
-// v42 sem nenhum filtro aplicado — as 7 linhas batem em todas as 9 colunas.
+// Universo: Comparativo e Região Comercial agregam sobre toda a base
+// CRUZADA (contratações que cruzam uma cotação, mesmo universo de
+// v_ontem_comparacao); Clientes usa o mesmo universo para Frete
+// Contratado/Diferença, mas a Qtd. de Processos conta toda a base de
+// cotações do cliente (cruzada ou não) — replica exatamente `BASE.cli[i]`
+// do Artifact original, que não depende de contrato cruzado.
+//
+// Validado campo a campo (Playwright, servindo o Artifact v42 localmente
+// via `python -m http.server` e lendo `Chart.getChart(canvas).data`) contra
+// #chartUf (sem filtro) e #chartClientes (3 métricas, sem filtro) — ver
+// relatório da etapa. Pequenas diferenças residuais de centavos entre o
+// snapshot do Artifact e o estado atual do Supabase (~R$46 em "VALE DO
+// TAQUARI", ~R$36 em "LITORAL", 353 vs 351 em "Não disponível") são drift
+// normal de dado entre builds (achado: CNPJ do próprio SOMA/RS classificado
+// hoje como regiao_normalizada="SOMA/RS", ausente dessa forma no snapshot
+// do Artifact) — não indicam erro de lógica na migration.
 //
 // Fora do escopo desta etapa (não portadas ainda, ver mapa de migração):
-// as outras 5 sub-abas da página original "Transportadoras & Cidades"
-// (Preço × Prazo, Performance, Clientes, Região Comercial, Cidades). Por
-// isso não há menu de sub-abas ainda — só o conteúdo do Comparativo.
+// as 3 sub-abas restantes da página original "Transportadoras & Cidades"
+// (Preço × Prazo, Performance, Cidades).
 export const dynamic = "force-dynamic";
 
 interface TransportadoraRow {
@@ -59,10 +85,23 @@ function CarrierDot({ t }: { t: string }) {
   return <span className="carrier-dot" style={{ background: carrierColor(t) }} />;
 }
 
-async function getTransportadorasData(): Promise<TransportadoraRow[]> {
-  const { data, error } = await supabase.rpc("transportadoras_comparativo");
-  if (error) throw new Error(error.message);
-  const rows: TransportadoraRow[] = ((data as Record<string, unknown>[]) ?? []).map((r) => ({
+interface TransportadorasData {
+  comparativo: TransportadoraRow[];
+  regiaoComercial: RegiaoComercialRow[];
+  clientes: ClienteMetricaRow[];
+}
+
+async function getTransportadorasData(): Promise<TransportadorasData> {
+  const [compRes, regiaoRes, clientesRes] = await Promise.all([
+    supabase.rpc("transportadoras_comparativo"),
+    supabase.rpc("transportadoras_regiao_comercial"),
+    supabase.rpc("transportadoras_clientes_metricas"),
+  ]);
+  for (const res of [compRes, regiaoRes, clientesRes]) {
+    if (res.error) throw new Error(res.error.message);
+  }
+
+  const comparativo: TransportadoraRow[] = ((compRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
     transportadora: String(r.transportadora),
     qtd_cotada: Number(r.qtd_cotada ?? 0),
     qtd_contratada: Number(r.qtd_contratada ?? 0),
@@ -75,7 +114,24 @@ async function getTransportadorasData(): Promise<TransportadoraRow[]> {
     pct_contratada: r.pct_contratada == null ? null : Number(r.pct_contratada),
   }));
   // defensivo: a função SQL já devolve ordenado por valor_contratado desc
-  return rows.sort((a, b) => b.valor_contratado - a.valor_contratado);
+  comparativo.sort((a, b) => b.valor_contratado - a.valor_contratado);
+
+  const regiaoComercial: RegiaoComercialRow[] = ((regiaoRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    regiao: String(r.regiao),
+    valor_contratado: Number(r.valor_contratado ?? 0),
+    n_processos: Number(r.n_processos ?? 0),
+  }));
+  // defensivo: a função SQL já devolve ordenado por valor_contratado desc
+  regiaoComercial.sort((a, b) => b.valor_contratado - a.valor_contratado);
+
+  const clientes: ClienteMetricaRow[] = ((clientesRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    cliente: String(r.cliente),
+    frete_contratado: Number(r.frete_contratado ?? 0),
+    diferenca_positiva: Number(r.diferenca_positiva ?? 0),
+    n_processos: Number(r.n_processos ?? 0),
+  }));
+
+  return { comparativo, regiaoComercial, clientes };
 }
 
 function fmtBRL(v: number | null | undefined): string {
@@ -96,13 +152,18 @@ function fmtPct(v: number | null | undefined, d = 1): string {
 }
 
 export default async function TransportadorasPage() {
-  let rows: TransportadoraRow[] = [];
+  let data: TransportadorasData | null = null;
   let erro: string | null = null;
   try {
-    rows = await getTransportadorasData();
+    data = await getTransportadorasData();
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
+
+  const rows = data?.comparativo ?? [];
+  const regiaoTodas = data?.regiaoComercial ?? [];
+  const regiaoTop15 = regiaoTodas.slice(0, 15);
+  const clientes = data?.clientes ?? [];
 
   const custoTotal = rows.reduce((s, r) => s + r.valor_contratado, 0);
   const totalContratos = rows.reduce((s, r) => s + r.qtd_contratada, 0);
@@ -113,9 +174,9 @@ export default async function TransportadorasPage() {
         <div className="app-header-inner">
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Transportadoras — Comparativo</h1>
+            <h1>Transportadoras &amp; Cidades</h1>
             <p>
-              Comparação factual entre as 7 transportadoras — cotada × contratada × mais barata —
+              Comparação factual entre as 7 transportadoras, por Região Comercial e por Cliente —
               sobre <b>toda a base</b> (ofertas e contratações cruzadas a uma cotação, sem filtro de
               dia nem filtro global nesta etapa). Sem classificação de oportunidade/risco de propósito.
             </p>
@@ -138,74 +199,125 @@ export default async function TransportadorasPage() {
           <div className="status-banner">Sem dados de transportadoras nos dados atuais.</div>
         ) : (
           <>
-            <section className="bloc" style={{ marginTop: 0 }}>
-              <div className="op-note" style={{ marginBottom: 16 }}>
-                {fmtNum(rows.length)} transportadoras &middot; <b>{fmtBRL(custoTotal)}</b> em frete
-                contratado (toda a base cruzada) &middot; <b>{fmtNum(totalContratos)}</b> contratações
+            <TransportadorasTabs
+              tabs={[
+                { id: "transp-comparativo", label: "Comparativo" },
+                { id: "transp-regiao", label: "Região Comercial" },
+                { id: "transp-clientes", label: "Clientes" },
+              ]}
+              defaultTab="transp-comparativo"
+            >
+              <div className="subpage" data-subpage="transp-comparativo">
+                <section className="bloc" style={{ marginTop: 0 }}>
+                  <div className="op-note" style={{ marginBottom: 16 }}>
+                    {fmtNum(rows.length)} transportadoras &middot; <b>{fmtBRL(custoTotal)}</b> em frete
+                    contratado (toda a base cruzada) &middot; <b>{fmtNum(totalContratos)}</b> contratações
+                  </div>
+
+                  <div className="bloc-head">
+                    <h2>Comparativo</h2>
+                    <div className="desc">
+                      1 linha por transportadora, ordenado por Valor Contratado desc &middot; &quot;Qtd.
+                      Cotada&quot; conta toda oferta registrada (vencedora ou não); &quot;Vezes Mais
+                      Barata&quot; considera todas as cotações comparáveis da base (não só as
+                      contratadas) — [KPI-08]/[DEC-15]: é uma distribuição, as % somam 100% entre
+                      transportadoras, não é desempenho absoluto isolado.
+                    </div>
+                  </div>
+
+                  <div className="table-scroll">
+                    <table className="data" id="tblTransp">
+                      <thead>
+                        <tr>
+                          <th>Transportadora</th>
+                          <th className="num">Qtd. Cotada</th>
+                          <th className="num">Qtd. Contratada</th>
+                          <th className="num">Valor Contratado</th>
+                          <th className="num">Frete Médio</th>
+                          <th className="num">Vezes Mais Barata</th>
+                          <th className="num">% Mais Barata</th>
+                          <th className="num">Diferença Média</th>
+                          <th className="num">% Participação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.transportadora}>
+                            <td>
+                              <CarrierDot t={r.transportadora} /> {r.transportadora}
+                            </td>
+                            <td className="num">{fmtNum(r.qtd_cotada)}</td>
+                            <td className="num">{fmtNum(r.qtd_contratada)}</td>
+                            <td className="num">{fmtBRL(r.valor_contratado)}</td>
+                            <td className="num">{fmtBRL2(r.frete_medio)}</td>
+                            <td className="num">{fmtNum(r.vezes_mais_barata)}</td>
+                            <td className="num">{fmtPct(r.pct_mais_barata)}</td>
+                            <td className="num">{fmtBRL2(r.diferenca_media)}</td>
+                            <td className="num">{fmtPct(r.pct_participacao)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section className="bloc">
+                  <div className="bloc-head">
+                    <h2>Contratada × Mais Barata · Ranking</h2>
+                    <div className="desc">mesmos dados da tabela acima, em gráfico</div>
+                  </div>
+                  <ComparativoCharts
+                    rows={rows.map((r) => ({
+                      transportadora: r.transportadora,
+                      qtd_cotada: r.qtd_cotada,
+                      vezes_mais_barata: r.vezes_mais_barata,
+                      pct_mais_barata: r.pct_mais_barata,
+                      pct_contratada: r.pct_contratada,
+                    }))}
+                  />
+                </section>
               </div>
 
-              <div className="bloc-head">
-                <h2>Comparativo</h2>
-                <div className="desc">
-                  1 linha por transportadora, ordenado por Valor Contratado desc &middot; &quot;Qtd.
-                  Cotada&quot; conta toda oferta registrada (vencedora ou não); &quot;Vezes Mais
-                  Barata&quot; considera todas as cotações comparáveis da base (não só as
-                  contratadas) — [KPI-08]/[DEC-15]: é uma distribuição, as % somam 100% entre
-                  transportadoras, não é desempenho absoluto isolado.
-                </div>
+              <div className="subpage" data-subpage="transp-regiao">
+                <section className="bloc" style={{ marginTop: 0 }}>
+                  <div className="bloc-head">
+                    <h2>Região Comercial</h2>
+                    <div className="desc">
+                      Top 15 de {fmtNum(regiaoTodas.length)} Regiões Comerciais por valor contratado —
+                      toda a base cruzada, sem filtro de dia. Região Comercial (`clientes.regiao_normalizada`)
+                      é a região de venda do cadastro, não é UF/estado ([DEC-02] FINAL).
+                    </div>
+                  </div>
+                  {regiaoTop15.length === 0 ? (
+                    <div className="status-banner">Sem dados de Região Comercial nos dados atuais.</div>
+                  ) : (
+                    <div className="card">
+                      <RegiaoComercialChart rows={regiaoTop15} />
+                    </div>
+                  )}
+                </section>
               </div>
 
-              <div className="table-scroll">
-                <table className="data" id="tblTransp">
-                  <thead>
-                    <tr>
-                      <th>Transportadora</th>
-                      <th className="num">Qtd. Cotada</th>
-                      <th className="num">Qtd. Contratada</th>
-                      <th className="num">Valor Contratado</th>
-                      <th className="num">Frete Médio</th>
-                      <th className="num">Vezes Mais Barata</th>
-                      <th className="num">% Mais Barata</th>
-                      <th className="num">Diferença Média</th>
-                      <th className="num">% Participação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.transportadora}>
-                        <td>
-                          <CarrierDot t={r.transportadora} /> {r.transportadora}
-                        </td>
-                        <td className="num">{fmtNum(r.qtd_cotada)}</td>
-                        <td className="num">{fmtNum(r.qtd_contratada)}</td>
-                        <td className="num">{fmtBRL(r.valor_contratado)}</td>
-                        <td className="num">{fmtBRL2(r.frete_medio)}</td>
-                        <td className="num">{fmtNum(r.vezes_mais_barata)}</td>
-                        <td className="num">{fmtPct(r.pct_mais_barata)}</td>
-                        <td className="num">{fmtBRL2(r.diferenca_media)}</td>
-                        <td className="num">{fmtPct(r.pct_participacao)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="subpage" data-subpage="transp-clientes">
+                <section className="bloc" style={{ marginTop: 0 }}>
+                  <div className="bloc-head">
+                    <h2>Clientes</h2>
+                    <div className="desc">
+                      Top 12 clientes pela métrica escolhida — Frete Contratado e Diferença Financeira
+                      Identificada olham só para a base cruzada (mesmo universo do Comparativo); Qtd. de
+                      Processos conta toda cotação do cliente, cruzada ou não.
+                    </div>
+                  </div>
+                  {clientes.length === 0 ? (
+                    <div className="status-banner">Sem dados de Clientes nos dados atuais.</div>
+                  ) : (
+                    <div className="card">
+                      <ClientesChart rows={clientes} />
+                    </div>
+                  )}
+                </section>
               </div>
-            </section>
-
-            <section className="bloc">
-              <div className="bloc-head">
-                <h2>Contratada × Mais Barata · Ranking</h2>
-                <div className="desc">mesmos dados da tabela acima, em gráfico</div>
-              </div>
-              <ComparativoCharts
-                rows={rows.map((r) => ({
-                  transportadora: r.transportadora,
-                  qtd_cotada: r.qtd_cotada,
-                  vezes_mais_barata: r.vezes_mais_barata,
-                  pct_mais_barata: r.pct_mais_barata,
-                  pct_contratada: r.pct_contratada,
-                }))}
-              />
-            </section>
+            </TransportadorasTabs>
 
             <section className="bloc">
               <div className="card">
@@ -219,14 +331,6 @@ export default async function TransportadorasPage() {
                     </li>
                     <li>
                       <span className="name">Performance</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
-                    </li>
-                    <li>
-                      <span className="name">Clientes</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
-                    </li>
-                    <li>
-                      <span className="name">Região Comercial</span>
                       <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
                     </li>
                     <li>
