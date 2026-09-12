@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 // Cabeçalho global (badges + metadados) portado do Artifact original
 // (<header class="top"> / #hdrBadges / #hdrLastDate / #hdrFileDate,
@@ -39,7 +39,13 @@ import { supabase } from "@/lib/supabase";
 // esta página foi montada", uma diferença sutil e potencialmente confusa
 // para o Mikael. (a) comunica de forma mais clara que os dados são
 // sempre atuais (ao vivo), que é o ponto real desta migração.
+//
+// [TASK-29] Fase 6 (Supabase Auth, 2026-09-12) — usa createSupabaseServerClient()
+// (cookie-aware) em vez do cliente compartilhado sem sessão: as policies de
+// leitura foram restritas a `authenticated`, e esta function precisa do JWT
+// do usuário logado para não vir vazia (ver commit em src/app/page.tsx).
 export async function SidebarStats() {
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("header_stats").single();
 
   if (error || !data) {
