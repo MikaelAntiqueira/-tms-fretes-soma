@@ -4,15 +4,21 @@ import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FinanceiroTabs } from "./FinanceiroTabs";
 import { CotadoContratadoCharts } from "./CotadoContratadoCharts";
+import { PadroesCharts } from "./PadroesCharts";
+import { PesoCustoCharts } from "./PesoCustoCharts";
 
-// Página "Financeiro" — sub-abas "Visão Geral" (inalterada) + "Cotado ×
-// Contratado" (nova, TASK-29 continuação, 2026-09-11/12), rota /financeiro.
-// Porta, linha a linha, `aggBase(mask)` + `renderKPIs` + `renderJanelaHome` +
-// `renderExec` (Visão Geral) e `renderEvolucao` + `renderEconomiaMes` +
-// `renderEscolheu` (Cotado × Contratado) do Artifact original (v42) — ver
-// `docs/mapa-migracao-tms-v3-2026-09-11.md`, `memoria/04_DICIONARIO_DADOS.md`
-// e `memoria/05_DICIONARIO_KPIS.md` ([KPI-01]/[KPI-02]/[KPI-04]/[KPI-05]/
-// [KPI-16], [DEC-25] FINAL — não há campo de "motivo").
+// Página "Financeiro" — 4 sub-abas ("Visão Geral", "Cotado × Contratado",
+// "Padrões da Diferença", "Peso, Cubagem & Custo"), rota /financeiro.
+// [TASK-29] continuação, 2026-09-11/12/13. Porta, linha a linha, `aggBase
+// (mask)` + `renderKPIs` + `renderJanelaHome` + `renderExec` (Visão Geral),
+// `renderEvolucao` + `renderEconomiaMes` + `renderEscolheu` (Cotado ×
+// Contratado), `renderPadroes` (Padrões da Diferença) e `renderPeso` +
+// `renderPrazo` + `renderCubagemCusto` (Peso, Cubagem & Custo) do Artifact
+// original (v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md`,
+// `memoria/04_DICIONARIO_DADOS.md` e `memoria/05_DICIONARIO_KPIS.md`
+// ([KPI-01]/[KPI-02]/[KPI-04]/[KPI-05]/[KPI-16], [DEC-25] FINAL — não há
+// campo de "motivo", [DEC-26] faixas de peso/cubagem, [DEC-27] "peso
+// considerado" = max(peso real, peso cubado)).
 //
 // Diferença importante de universo vs. /ontem e /operacao: os KPIs desta
 // página agregam TODA a base de cotações (6.915 linhas), não só as
@@ -30,35 +36,51 @@ import { CotadoContratadoCharts } from "./CotadoContratadoCharts";
 // `transportadoras_comparativo()` (Bloco 3, maior participação/maior %
 // mais barata) já existentes — não recalcula nada que essas duas já fazem.
 //
-// Sub-aba "Cotado × Contratado" (nova): agregação mensal via RPC nova
-// `financeiro_evolucao_mensal()` (migration `fn_financeiro_evolucao_mensal_e_
+// Sub-aba "Cotado × Contratado": agregação mensal via RPC `financeiro_
+// evolucao_mensal()` (migration `fn_financeiro_evolucao_mensal_e_
 // diff_n_esc_nao`) — 1 linha por mês (frete/melhor/nMelhor/diffPosSum),
-// construída em cima de `v_financeiro_base` como CTE (não duplica a lógica
-// de janela/melhor-cotação, só agrupa por mês de `cotacoes.criado_em`). O
-// doughnut "Escolheu a Mais Barata?" reaproveita os contadores esc_s/esc_n/
-// esc_sc que `financeiro_visao_geral_kpis()` já devolve (1896/1392/1906,
-// conferido) — só a soma de `diferenca_r` das linhas `esc='N'` (`diffN` do
-// Artifact) precisava de peça nova, via RPC `financeiro_diff_n_esc_nao()`.
+// construída em cima de `v_financeiro_base` como CTE. O doughnut "Escolheu
+// a Mais Barata?" reaproveita os contadores esc_s/esc_n/esc_sc de
+// `financeiro_visao_geral_kpis()` — só a soma de `diferenca_r` das linhas
+// `esc='N'` precisava de peça nova, via RPC `financeiro_diff_n_esc_nao()`.
 //
-// Confirmado por teste direto contra o Artifact v42 (Playwright, sem
-// filtro): "Região Comercial" do resumo executivo é `clientes
-// .regiao_normalizada` (ex. "LITORAL"), NÃO `regiao_comercial_bruta` (ex.
-// "LITORAL PRIVADO" — inclui o sufixo de Tipo de Cliente). E "Total de
-// Pedidos" usa COALESCE(cotacoes.pedido, pedido da contratação cruzada)
-// porque cotacoes.pedido sozinho está incompleto (885 cruzadas com Pedido
-// Nº só na contratação) — ver comentário da migration de correção.
+// Sub-abas "Padrões da Diferença" e "Peso, Cubagem & Custo" (novas, 2026-09-
+// 13): 8 RPCs novas (migration `fn_financeiro_padroes_e_peso_cubagem`),
+// todas em cima de uma view auxiliar nova `v_financeiro_padroes_base`
+// (1 linha por cotação, mesmo grão de `v_financeiro_base`, estendida com
+// tipo_cliente/nome do cliente, transportadora CONTRATADA e prazo
+// contratado — a oferta da PRÓPRIA transportadora contratada, mesmo padrão
+// de `v_ontem_radar.prazo` —, peso considerado e faixa de cubagem):
+// `financeiro_diff_por_prazo`, `financeiro_diff_por_regiao`,
+// `financeiro_diff_por_transportadora`, `financeiro_diff_por_tipo_cliente`,
+// `financeiro_peso_frete`, `financeiro_outliers_peso`,
+// `financeiro_prazo_frete_medio`, `financeiro_cubagem_custo`. IMPORTANTE:
+// "Região Comercial" aqui usa `regiao_normalizada` (mesmo campo que
+// RegiaoComercialChart.tsx de /transportadoras já usa) — o Artifact
+// original faz `BASE.regiaoComercial = BASE.uf.map(normalizarRegiaoComercial)`
+// (HTML de referência, linha ~1184-1191): é a região JÁ normalizada (sem o
+// sufixo " PRIVADO"/" PUBLICO"), nunca a bruta.
 //
-// Validado campo a campo (Playwright) contra #kpiGrid / #homeJanelas /
+// Validado campo a campo (Playwright) contra #kpiGrid/#homeJanelas/
 // #execText do Artifact v42 sem nenhum filtro aplicado — os 8 KPIs, os 2
 // mini-cards de janela e as 5 frases do resumo batem exatamente. Os 2
 // gráficos de evolução mensal, o doughnut e o card de impacto da sub-aba
-// nova foram validados do mesmo jeito contra #chartEvolucao/#chartEconomiaMes/
-// #chartEscolheu/#impactoDecisao — ver relatório do TASK-29 continuação.
+// "Cotado × Contratado" foram validados do mesmo jeito. Os 4 gráficos de
+// "Padrões da Diferença" e os 2 gráficos + outliers + tabela de cubagem de
+// "Peso, Cubagem & Custo" foram validados por raciocínio linha a linha
+// sobre a lógica replicada (o filtro global ainda não existe no Next.js,
+// então o "recorte atual" é sempre a base inteira comparável — igual ao
+// estado inicial sem filtro do Artifact) + conferência cruzada de total:
+// `financeiro_cubagem_custo()` soma R$ 494.417,43 de frete contratado
+// (5.194 processos) — o MESMO total já validado em `financeiro_visao_geral_
+// kpis().frete_total` (ver ISSUE de paginação do PostgREST, `06_LOG_
+// DECISOES.md`) — e a soma de `financeiro_diff_por_tipo_cliente()` bate
+// com `financeiro_visao_geral_kpis().diff_pos_sum` (R$ 45.938,44).
 //
 // Fora do escopo desta etapa, de propósito (ver bloco "Pendências" no fim
 // da página): a "Simulação de Custo por Transportadora" (4º bloco da
-// Visão Geral original) e as outras 2 sub-abas restantes da página
-// Financeiro original (Padrões da Diferença, Peso/Cubagem & Custo).
+// Visão Geral original) — regra "nunca estima, sempre real, operação a
+// operação" merece validação própria, com mais tempo.
 export const dynamic = "force-dynamic";
 
 interface FinanceiroKpis {
@@ -108,6 +130,58 @@ interface EvolucaoMesRow {
   diffPosSum: number;
 }
 
+interface DiffPorPrazoRow {
+  prazo: number;
+  diffMedia: number;
+  n: number;
+}
+
+interface DiffPorRegiaoRow {
+  regiao: string;
+  diffSum: number;
+}
+
+interface DiffPorTransportadoraRow {
+  transportadora: string;
+  diffSum: number;
+}
+
+interface DiffPorTipoRow {
+  tipo: string;
+  diffSum: number;
+}
+
+interface PesoBinRow {
+  binIdx: number;
+  binLabel: string;
+  n: number;
+  freteMedio: number;
+}
+
+interface OutlierPesoRow {
+  cliente: string;
+  peso: number;
+  frete: number;
+  faixa: string;
+  mediana: number;
+}
+
+interface PrazoFreteRow {
+  prazo: number;
+  freteMedio: number;
+  n: number;
+}
+
+interface CubagemCustoRow {
+  faixa: string;
+  n: number;
+  peso: number;
+  cbm: number;
+  frete: number;
+  custoKg: number | null;
+  custoM3: number | null;
+}
+
 interface FinanceiroData {
   kpis: FinanceiroKpis | null;
   resumo: FinanceiroResumo | null;
@@ -116,18 +190,68 @@ interface FinanceiroData {
   evolucaoMensal: EvolucaoMesRow[];
   maxMes: string | null;
   diffNEscNao: number;
+  diffPorPrazo: DiffPorPrazoRow[];
+  comPrazo: number;
+  semPrazo: number;
+  diffPorRegiao: DiffPorRegiaoRow[];
+  diffPorTransportadora: DiffPorTransportadoraRow[];
+  diffPorTipo: DiffPorTipoRow[];
+  pesoBins: PesoBinRow[];
+  outliersPeso: OutlierPesoRow[];
+  prazoFrete: PrazoFreteRow[];
+  cubagemCusto: CubagemCustoRow[];
+  custoKgGeral: number | null;
+  custoM3Geral: number | null;
 }
 
 async function getFinanceiroData(): Promise<FinanceiroData> {
-  const [kpisRes, resumoRes, janelasRes, transpRes, evolucaoRes, diffNRes] = await Promise.all([
+  const [
+    kpisRes,
+    resumoRes,
+    janelasRes,
+    transpRes,
+    evolucaoRes,
+    diffNRes,
+    diffPrazoRes,
+    diffRegiaoRes,
+    diffTranspRes,
+    diffTipoRes,
+    pesoFreteRes,
+    outliersRes,
+    prazoFreteRes,
+    cubagemRes,
+  ] = await Promise.all([
     supabase.rpc("financeiro_visao_geral_kpis"),
     supabase.rpc("financeiro_visao_geral_resumo"),
     supabase.rpc("operacao_por_janela"),
     supabase.rpc("transportadoras_comparativo"),
     supabase.rpc("financeiro_evolucao_mensal"),
     supabase.rpc("financeiro_diff_n_esc_nao"),
+    supabase.rpc("financeiro_diff_por_prazo"),
+    supabase.rpc("financeiro_diff_por_regiao"),
+    supabase.rpc("financeiro_diff_por_transportadora"),
+    supabase.rpc("financeiro_diff_por_tipo_cliente"),
+    supabase.rpc("financeiro_peso_frete"),
+    supabase.rpc("financeiro_outliers_peso"),
+    supabase.rpc("financeiro_prazo_frete_medio"),
+    supabase.rpc("financeiro_cubagem_custo"),
   ]);
-  for (const res of [kpisRes, resumoRes, janelasRes, transpRes, evolucaoRes, diffNRes]) {
+  for (const res of [
+    kpisRes,
+    resumoRes,
+    janelasRes,
+    transpRes,
+    evolucaoRes,
+    diffNRes,
+    diffPrazoRes,
+    diffRegiaoRes,
+    diffTranspRes,
+    diffTipoRes,
+    pesoFreteRes,
+    outliersRes,
+    prazoFreteRes,
+    cubagemRes,
+  ]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -193,7 +317,87 @@ async function getFinanceiroData(): Promise<FinanceiroData> {
   const maxMes = evolucaoRows[0]?.max_mes != null ? String(evolucaoRows[0].max_mes) : null;
   const diffNEscNao = Number(diffNRes.data ?? 0);
 
-  return { kpis, resumo, janelas, topTransportadora, evolucaoMensal, maxMes, diffNEscNao };
+  const diffPrazoRows = (diffPrazoRes.data as Record<string, unknown>[]) ?? [];
+  const diffPorPrazo: DiffPorPrazoRow[] = diffPrazoRows.map((r) => ({
+    prazo: Number(r.prazo),
+    diffMedia: Number(r.diff_media ?? 0),
+    n: Number(r.n ?? 0),
+  }));
+  const comPrazo = Number(diffPrazoRows[0]?.com_prazo ?? 0);
+  const semPrazo = Number(diffPrazoRows[0]?.sem_prazo ?? 0);
+
+  const diffPorRegiao: DiffPorRegiaoRow[] = ((diffRegiaoRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    regiao: String(r.regiao),
+    diffSum: Number(r.diff_sum ?? 0),
+  }));
+
+  const diffPorTransportadora: DiffPorTransportadoraRow[] = ((diffTranspRes.data as Record<string, unknown>[]) ?? []).map(
+    (r) => ({
+      transportadora: String(r.transportadora),
+      diffSum: Number(r.diff_sum ?? 0),
+    })
+  );
+
+  const diffPorTipo: DiffPorTipoRow[] = ((diffTipoRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    tipo: String(r.tipo),
+    diffSum: Number(r.diff_sum ?? 0),
+  }));
+
+  const pesoBins: PesoBinRow[] = ((pesoFreteRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    binIdx: Number(r.bin_idx),
+    binLabel: String(r.bin_label),
+    n: Number(r.n ?? 0),
+    freteMedio: Number(r.frete_medio ?? 0),
+  }));
+
+  const outliersPeso: OutlierPesoRow[] = ((outliersRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    cliente: (r.cliente as string) ?? "—",
+    peso: Number(r.peso ?? 0),
+    frete: Number(r.frete ?? 0),
+    faixa: String(r.faixa),
+    mediana: Number(r.mediana ?? 0),
+  }));
+
+  const prazoFrete: PrazoFreteRow[] = ((prazoFreteRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    prazo: Number(r.prazo),
+    freteMedio: Number(r.frete_medio ?? 0),
+    n: Number(r.n ?? 0),
+  }));
+
+  const cubagemRows = (cubagemRes.data as Record<string, unknown>[]) ?? [];
+  const cubagemCusto: CubagemCustoRow[] = cubagemRows.map((r) => ({
+    faixa: String(r.faixa),
+    n: Number(r.n ?? 0),
+    peso: Number(r.peso ?? 0),
+    cbm: Number(r.cbm ?? 0),
+    frete: Number(r.frete ?? 0),
+    custoKg: r.custo_kg == null ? null : Number(r.custo_kg),
+    custoM3: r.custo_m3 == null ? null : Number(r.custo_m3),
+  }));
+  const custoKgGeral = cubagemRows[0]?.custo_kg_geral == null ? null : Number(cubagemRows[0].custo_kg_geral);
+  const custoM3Geral = cubagemRows[0]?.custo_m3_geral == null ? null : Number(cubagemRows[0].custo_m3_geral);
+
+  return {
+    kpis,
+    resumo,
+    janelas,
+    topTransportadora,
+    evolucaoMensal,
+    maxMes,
+    diffNEscNao,
+    diffPorPrazo,
+    comPrazo,
+    semPrazo,
+    diffPorRegiao,
+    diffPorTransportadora,
+    diffPorTipo,
+    pesoBins,
+    outliersPeso,
+    prazoFrete,
+    cubagemCusto,
+    custoKgGeral,
+    custoM3Geral,
+  };
 }
 
 function fmtBRL(v: number | null | undefined): string {
@@ -236,6 +440,18 @@ export default async function FinanceiroPage() {
   const evolucaoMensal = data?.evolucaoMensal ?? [];
   const maxMes = data?.maxMes ?? null;
   const diffNEscNao = data?.diffNEscNao ?? 0;
+  const diffPorPrazo = data?.diffPorPrazo ?? [];
+  const comPrazo = data?.comPrazo ?? 0;
+  const semPrazo = data?.semPrazo ?? 0;
+  const diffPorRegiao = data?.diffPorRegiao ?? [];
+  const diffPorTransportadora = data?.diffPorTransportadora ?? [];
+  const diffPorTipo = data?.diffPorTipo ?? [];
+  const pesoBins = data?.pesoBins ?? [];
+  const outliersPeso = data?.outliersPeso ?? [];
+  const prazoFrete = data?.prazoFrete ?? [];
+  const cubagemCusto = data?.cubagemCusto ?? [];
+  const custoKgGeral = data?.custoKgGeral ?? null;
+  const custoM3Geral = data?.custoM3Geral ?? null;
 
   const pctBarata = k && k.escS + k.escN > 0 ? k.escS / (k.escS + k.escN) : null;
   const pctSobreContratado = k && k.freteTotal ? k.diffPosSum / k.freteTotal : null;
@@ -260,6 +476,15 @@ export default async function FinanceiroPage() {
   const ecoFiltrado = evolucaoMensal.filter((r) => r.diffPosSum > 0 || (maxMes != null && r.mes < maxMes));
   const ecoLabels = ecoFiltrado.map((r) => fmtMes(r.mes));
   const ecoData = ecoFiltrado.map((r) => r.diffPosSum);
+
+  // ---- renderPadroes(mask) — porta exata do Artifact v42 ----
+  const totalComp = comPrazo + semPrazo;
+  const coverageLabel =
+    totalComp > 0
+      ? `Cobertura: ${fmtPct(comPrazo / totalComp)} dos processos comparáveis no filtro (${fmtNum(comPrazo)} de ${fmtNum(
+          totalComp
+        )})`
+      : "Cobertura: —";
 
   interface KpiTile {
     lbl: string;
@@ -355,6 +580,8 @@ export default async function FinanceiroPage() {
             tabs={[
               { id: "fin-visao", label: "Visão Geral" },
               { id: "fin-cotado", label: "Cotado × Contratado" },
+              { id: "fin-padroes", label: "Padrões da Diferença" },
+              { id: "fin-peso", label: "Peso, Cubagem & Custo" },
             ]}
             defaultTab="fin-visao"
           >
@@ -502,7 +729,7 @@ export default async function FinanceiroPage() {
               <section className="bloc">
                 <div className="card">
                   <h3>Pendências desta etapa</h3>
-                  <div className="sub">4º bloco da Visão Geral original + demais sub-abas da página Financeiro</div>
+                  <div className="sub">4º bloco da Visão Geral original</div>
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
                       <li>
@@ -511,14 +738,6 @@ export default async function FinanceiroPage() {
                           fora de propósito nesta etapa — regra &quot;nunca estima, sempre real, operação a
                           operação&quot; merece validação própria, com mais tempo
                         </span>
-                      </li>
-                      <li>
-                        <span className="name">Padrões da Diferença</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
-                      </li>
-                      <li>
-                        <span className="name">Peso, Cubagem &amp; Custo</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
                       </li>
                     </ul>
                   </div>
@@ -543,23 +762,137 @@ export default async function FinanceiroPage() {
                   diffN={diffNEscNao}
                 />
               </section>
+            </div>
+
+            <div className="subpage" data-subpage="fin-padroes">
+              <section className="bloc" style={{ marginTop: 0 }}>
+                <div className="bloc-head">
+                  <h2>Padrões da diferença financeira</h2>
+                  <div className="desc">
+                    Onde a diferença financeira se concentra — diferença observada, não erro nem economia perdida; a
+                    correlação não confirma motivo
+                  </div>
+                </div>
+                <PadroesCharts
+                  prazoRows={diffPorPrazo}
+                  coverageLabel={coverageLabel}
+                  regiaoRows={diffPorRegiao}
+                  transpRows={diffPorTransportadora}
+                  tipoRows={diffPorTipo}
+                />
+              </section>
+            </div>
+
+            <div className="subpage" data-subpage="fin-peso">
+              <section className="bloc" style={{ marginTop: 0 }}>
+                <div className="bloc-head">
+                  <h2>Peso, Cubagem &amp; Custo</h2>
+                  <div className="desc">Relação entre peso, cubagem, prazo contratado e valor do frete</div>
+                </div>
+                <PesoCustoCharts pesoBins={pesoBins} prazoRows={prazoFrete} />
+
+                <div className="grid cols2" style={{ marginTop: 14 }}>
+                  <div className="card">
+                    <h3>Outliers de Peso x Frete</h3>
+                    <div className="sub">Fora de 1,5x o intervalo interquartil (IQR) da própria faixa de peso</div>
+                    <div className="table-scroll">
+                      <table className="data compact">
+                        <thead>
+                          <tr>
+                            <th>Cliente</th>
+                            <th>Peso (kg)</th>
+                            <th>Frete</th>
+                            <th>Faixa</th>
+                            <th>Mediana da faixa</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {outliersPeso.length ? (
+                            outliersPeso.map((o, i) => (
+                              <tr key={i}>
+                                <td>{o.cliente.slice(0, 30)}</td>
+                                <td className="num">{fmtNum(o.peso)}</td>
+                                <td className="num">{fmtBRL2(o.frete)}</td>
+                                <td>{o.faixa}</td>
+                                <td className="num">{fmtBRL2(o.mediana)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} style={{ color: "var(--text-muted)" }}>
+                                Nenhum outlier acima de 1,5×IQR no filtro atual.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </section>
 
               <section className="bloc">
-                <div className="card">
-                  <h3>Fora do escopo desta etapa</h3>
-                  <div className="sub">demais sub-abas da página original &quot;Financeiro&quot;</div>
-                  <div className="alert-card info" style={{ marginTop: 8 }}>
-                    <ul>
-                      <li>
-                        <span className="name">Padrões da Diferença</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
-                      </li>
-                      <li>
-                        <span className="name">Peso, Cubagem &amp; Custo</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>não portada ainda</span>
-                      </li>
-                    </ul>
+                <div className="bloc-head">
+                  <h2>Cubagem e custo unitário</h2>
+                  <div className="desc">Perfil de carga por faixa e custo por kg / por m³ no recorte atual</div>
+                </div>
+                <div className="grid op-kpis" style={{ marginBottom: 14 }}>
+                  <div className="kpi">
+                    <div className="lbl">Custo / kg — geral</div>
+                    <div className="val">{fmtBRL2(custoKgGeral)}</div>
+                    <div className="foot">
+                      Σ frete contratado ÷ Σ peso real · <b>DADO DERIVADO</b>
+                    </div>
                   </div>
+                  <div className="kpi">
+                    <div className="lbl">Custo / m³ — geral</div>
+                    <div className="val">{fmtBRL2(custoM3Geral)}</div>
+                    <div className="foot">
+                      Σ frete contratado ÷ Σ cubagem, só cargas com grade · <b>DADO DERIVADO</b>
+                    </div>
+                  </div>
+                </div>
+                <div className="table-scroll">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>Faixa de cubagem</th>
+                        <th className="num">Processos</th>
+                        <th className="num">Peso (kg)</th>
+                        <th className="num">Cubagem (m³)</th>
+                        <th className="num">Frete contratado</th>
+                        <th className="num">Custo / kg</th>
+                        <th className="num">Custo / m³</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cubagemCusto.length ? (
+                        cubagemCusto
+                          .filter((r) => r.n > 0)
+                          .map((r) => (
+                            <tr key={r.faixa}>
+                              <td>{r.faixa}</td>
+                              <td className="num">{fmtNum(r.n)}</td>
+                              <td className="num">{fmtNum(r.peso)}</td>
+                              <td className="num">{fmtNum(r.cbm, 1)}</td>
+                              <td className="num">{fmtBRL(r.frete)}</td>
+                              <td className="num">{r.custoKg != null ? fmtBRL2(r.custoKg) : "—"}</td>
+                              <td className="num">{r.custoM3 != null ? fmtBRL2(r.custoM3) : "—"}</td>
+                            </tr>
+                          ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} style={{ color: "var(--text-muted)" }}>
+                            Sem dados no recorte atual.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                  Cubagem m³ = Σ (altura·largura·comprimento) dos volumes da cotação — <b>dado derivado</b>.
+                  &quot;Não informado&quot; = cotação sem grade de volumes (contratação direta).
                 </div>
               </section>
             </div>
