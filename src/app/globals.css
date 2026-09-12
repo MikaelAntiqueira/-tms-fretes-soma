@@ -817,3 +817,26 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   .sidebar-scrim.open { display: block; }
   .with-sidebar, .with-sidebar.collapsed { margin-left: 0; }
 }
+
+/* ==========================================================================
+   Página "Transportadoras & Cidades" — sub-abas "Região Comercial" e
+   "Clientes" ([TASK-29] continuação, 2026-09-12). Reaproveita `.subnav`/
+   `.subpage` (já portado para a página "Financeiro", acima) para as 3
+   sub-abas desta página (Comparativo/Região Comercial/Clientes). Única
+   classe nova: `.metric-select`, o seletor de métrica (Frete Contratado /
+   Diferença Financeira Identificada / Qtd. Processos) da sub-aba
+   "Clientes" — no Artifact original é um `<select>`; aqui são 3 botões
+   (decisão técnica desta etapa), estilo derivado de `.subnav button` já
+   existente, mesmos tokens de cor. Reutilizada por
+   src/app/transportadoras/ClientesChart.tsx.
+   ========================================================================== */
+.metric-select { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.metric-select button {
+  font: 600 11.5px var(--font-ibm-plex-sans), sans-serif; padding: 6px 12px; border-radius: 99px;
+  border: 1px solid var(--border); background: var(--surface-card-alt); color: var(--text-secondary);
+  cursor: pointer;
+}
+.metric-select button:hover { color: var(--text-primary); background: var(--surface-sunken); }
+.metric-select button.active { background: var(--brand-700); color: #fff; border-color: var(--brand-700); }
+:root:not([data-theme="light"]) .metric-select button.active,
+:root[data-theme="dark"] .metric-select button.active { color: #04212f; }
