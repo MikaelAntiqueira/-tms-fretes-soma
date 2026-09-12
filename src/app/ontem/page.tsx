@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
@@ -304,6 +304,7 @@ function buildRadarCards(
 }
 
 async function getRadarData(ref: string): Promise<RadarCardData[]> {
+  const supabase = await createSupabaseServerClient();
   const [prazoRes, d2Res, d3Res, d4Res, d6Res] = await Promise.all([
     supabase.rpc("radar_prazo_hist"),
     supabase.rpc("radar_d2", { p_dia: ref }),
@@ -373,6 +374,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
 }
 
 async function getOntemData(): Promise<OntemData> {
+  const supabase = await createSupabaseServerClient();
   const refRes = await supabase.rpc("ontem_dia_referencia");
   if (refRes.error) throw new Error(refRes.error.message);
   const ref = (refRes.data as string | null) ?? null;
