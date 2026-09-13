@@ -1,0 +1,35 @@
+# Central de Contexto — ignorados
+
+# Credenciais e segredos — NUNCA commitar
+*.token
+*.pat
+*.key
+*.pem
+credenciais/
+tokens/
+.env.local
+.env.production
+
+# Build artifacts (já ignorados na raiz, mas reforçar aqui)
+.next/
+dist/
+build/
+node_modules/
+
+# Logs e stuff transitório
+*.log
+.tmp.*
+*.bak
+.cache/
+
+# Sessões do Claude local (não sync)
+.claude/sessions/
+.claude/daemon/
+.claude/jobs/
+.claude/shell-snapshots/
+
+# Dados gerados por IDEs
+.vscode/*
+!.vscode/settings.json
+*.swp
+*~
