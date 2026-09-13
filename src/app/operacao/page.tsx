@@ -1,14 +1,16 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 
 // Página "Operação" (Controle Operacional de Carregamento), rota /operacao.
 // Diferente de /ontem: NÃO é por dia — agrega TODA a base de contratações
-// cruzadas (cotacao_id preenchido), sem filtro de dia nem filtro global
-// (mesma simplificação já usada em /ontem nesta etapa da migração). Porta,
-// linha a linha, a lógica de `renderOperacao(mask)` do Artifact original
-// (v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md`,
-// `memoria/05_DICIONARIO_KPIS.md` e `docs/frete-minimo-observado-2026-09.md`.
+// cruzadas (cotacao_id preenchido), sem filtro de dia (mesma simplificação
+// já usada em /ontem nesta etapa da migração). Porta, linha a linha, a
+// lógica de `renderOperacao(mask)` do Artifact original (v42) — ver
+// `docs/mapa-migracao-tms-v3-2026-09-11.md`, `memoria/05_DICIONARIO_KPIS.md`
+// e `docs/frete-minimo-observado-2026-09.md`.
 //
 // Toda soma/contagem distinta é feita DENTRO do banco via RPC
 // (`operacao_kpis`, `operacao_por_transportadora`, `operacao_por_janela`,
@@ -21,6 +23,58 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 // janela e melhor cotação no recorte certo) como base — não duplica essa
 // lógica. O piso de frete OBSERVADO (ESTIMATIVA, não tabela oficial) vem de
 // `transportadoras.frete_minimo_observado`, nunca hardcoded no TS.
+//
+// ============================================================================
+// [TASK-29] MOTOR DE FILTRO GLOBAL — FASE 1, continuação /operacao
+// (2026-09-12/13). Estende para esta página o MESMO padrão já usado em
+// /financeiro (ver comentário completo em src/components/FilterBar.tsx e no
+// topo de src/app/financeiro/page.tsx): mesmo componente <FilterBar>, mesma
+// convenção de URL (?mes=/?transportadora=/?regiao=/?tipo=, multi-valor por
+// vírgula), mesma convenção de "null = todos".
+//
+// ESCOPO REDUZIDO, deliberado (mesma decisão já tomada em /financeiro): só a
+// função `operacao_por_janela` já tinha os 4 parâmetros opcionais
+// (`p_meses/p_transportadoras/p_regioes/p_tipos`, adicionados numa etapa
+// anterior pensando nesta extensão futura — ver migration
+// `fn_filtro_global_fase1_visao_geral`). As outras 4 RPCs desta página
+// (`operacao_kpis`, `operacao_por_transportadora`,
+// `operacao_por_janela_transportadora`, `operacao_por_cidade`) NÃO ganharam
+// parâmetros nesta rodada — então só a seção "Meio-dia × Tarde" REAGE ao
+// filtro (os 5 números agregados de cada janela: contratações/romaneios/
+// pedidos/peso/cubagem/frete). As seções "KPIs" (topo), "Quem está
+// carregando", "Distribuição do frete contratado" e "Cidade ×
+// Transportadora" continuam mostrando SEMPRE a base completa, sem filtro —
+// não é esquecimento, é o mesmo corte de escopo já documentado em
+// /financeiro (lá só a sub-aba "Visão Geral" reage).
+//
+// LIMITAÇÃO ADICIONAL, também deliberada: dentro da própria seção "Meio-dia
+// × Tarde", o "top 3 transportadoras" de cada janela (barra + %) vem de
+// `operacao_por_janela_transportadora`, que também NÃO tem os 4 parâmetros
+// — então, com um filtro ativo, os 5 números agregados do card (em cima)
+// mudam, mas o "top 3" abaixo continua mostrando a distribuição da BASE
+// COMPLETA daquela janela. Um aviso no card avisa disso quando há filtro
+// ativo. Estender `operacao_por_janela_transportadora` do mesmo jeito
+// (`create or replace function` com os 4 parâmetros novos, default null,
+// mesma assinatura) fica para uma etapa futura — não foi necessário para
+// entregar o pedido desta rodada (filtro global em /operacao e
+// /transportadoras) e mantém a mudança de SQL desta etapa mínima (só 1
+// function nova, aditiva: `filtro_opcoes_mes()`, ver abaixo).
+//
+// Opções dos 4 dropdowns: Mês vem de `filtro_opcoes_mes()` (function nova,
+// aditiva — /financeiro já busca a lista de meses reaproveitando
+// `financeiro_evolucao_mensal()`, que esta página não chama; `filtro_
+// opcoes_mes()` existe justamente para não obrigar uma RPC nova maior só
+// para listar 9 valores). Região/Tipo vêm de `financeiro_filtro_opcoes()`
+// (já existe, reaproveitada — não criamos outra). Transportadora usa
+// TRANSP_ORDER, a mesma lista fixa das 7 transportadoras já usada em
+// CARRIER_COLOR nesta página e em /financeiro/transportadoras.
+//
+// Validado direto no Supabase (com e sem filtro): `operacao_por_janela()`
+// sem args == Meio-dia 976 linhas/R$51.742,43, Tarde 4.218/R$442.675,00
+// (mesmos números de sempre, regressão zero); `operacao_por_janela(mes=
+// '2026-08')` == Meio-dia 276/R$13.685,36, Tarde 1.282/R$138.451,23 —
+// idêntico a `select ... from v_operacao_base where cotacao_id in (select
+// cotacao_id from v_cotacao_filtros where mes='2026-08')` direto em SQL.
 export const dynamic = "force-dynamic";
 
 const CARRIER_COLOR: Record<string, string> = {
@@ -35,6 +89,11 @@ const CARRIER_COLOR: Record<string, string> = {
 function carrierColor(t: string | null): string {
   return (t && CARRIER_COLOR[t]) || "var(--text-muted)";
 }
+
+// Mesma lista fixa das 7 transportadoras usada em /financeiro (TRANSP_ORDER)
+// — opções do dropdown "Transportadora Contratada" do FilterBar. Não é uma
+// query nova: mesma decisão já usada em CARRIER_COLOR acima.
+const TRANSP_ORDER = Object.keys(CARRIER_COLOR);
 
 interface OperacaoKpis {
   n_romaneios: number;
@@ -91,18 +150,42 @@ interface OperacaoData {
   janelas: JanelaRow[];
   janelaCarriers: JanelaCarrierRow[];
   cidades: CidadeRow[];
+  opcoesMeses: string[];
+  opcoesRegioes: string[];
+  opcoesTipos: string[];
 }
 
-async function getOperacaoData(): Promise<OperacaoData> {
+// Filtros da Fase 1 do motor de filtro global — mesma convenção de
+// src/app/financeiro/page.tsx (`null` numa dimensão = sem filtro nela).
+interface FiltrosOperacao {
+  meses: string[] | null;
+  transportadoras: string[] | null;
+  regioes: string[] | null;
+  tipos: string[] | null;
+}
+
+async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> {
   const supabase = await createSupabaseServerClient();
-  const [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes] = await Promise.all([
+  const filtroArgs = {
+    p_meses: filtros.meses,
+    p_transportadoras: filtros.transportadoras,
+    p_regioes: filtros.regioes,
+    p_tipos: filtros.tipos,
+  };
+
+  const [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes, mesesRes, opcoesRes] = await Promise.all([
+    // ---- sempre a base completa nesta etapa (ver comentário do topo) ----
     supabase.rpc("operacao_kpis"),
     supabase.rpc("operacao_por_transportadora"),
-    supabase.rpc("operacao_por_janela"),
+    // ---- única RPC desta página que já tem os 4 parâmetros — reage ao filtro ----
+    supabase.rpc("operacao_por_janela", filtroArgs),
     supabase.rpc("operacao_por_janela_transportadora"),
     supabase.rpc("operacao_por_cidade"),
+    // ---- opções completas (sem cascata) para os dropdowns do FilterBar ----
+    supabase.rpc("filtro_opcoes_mes"),
+    supabase.rpc("financeiro_filtro_opcoes"),
   ]);
-  for (const res of [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes]) {
+  for (const res of [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes, mesesRes, opcoesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -160,7 +243,12 @@ async function getOperacaoData(): Promise<OperacaoData> {
     cidade_total_frete: Number(r.cidade_total_frete ?? 0),
   }));
 
-  return { kpis, carriers, janelas, janelaCarriers, cidades };
+  const opcoesMeses: string[] = ((mesesRes.data as Record<string, unknown>[])?.[0]?.meses as string[] | null) ?? [];
+  const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+  const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
+  const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
+
+  return { kpis, carriers, janelas, janelaCarriers, cidades, opcoesMeses, opcoesRegioes, opcoesTipos };
 }
 
 function fmtBRL(v: number | null | undefined): string {
@@ -180,6 +268,27 @@ function fmtPct(v: number | null | undefined, d = 1): string {
   if (v == null || Number.isNaN(v)) return "—";
   return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
 }
+// Porta `fmtMes` do Artifact original / mesma function de /financeiro:
+// "2026-07" -> "jul/2026".
+function fmtMes(iso: string): string {
+  const [y, m] = iso.split("-");
+  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const idx = parseInt(m, 10) - 1;
+  return `${nomes[idx] ?? "?"}/${y}`;
+}
+
+// Lê um parâmetro de URL no formato "valor1,valor2" — mesma function de
+// src/app/financeiro/page.tsx (duplicada aqui de propósito, mesmo padrão já
+// usado no resto do repo para pequenos helpers por página).
+function parseMulti(raw: string | string[] | undefined): string[] | null {
+  if (!raw) return null;
+  const joined = Array.isArray(raw) ? raw.join(",") : raw;
+  const values = joined
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return values.length > 0 ? values : null;
+}
 
 // Classifica a magnitude da diferença sobre o frete DA PRÓPRIA LINHA (não
 // sobre a menor cotação, como em /ontem) — regra exata do Artifact de
@@ -196,11 +305,26 @@ function CarrierDot({ t }: { t: string }) {
   return <span className="carrier-dot" style={{ background: carrierColor(t) }} />;
 }
 
-export default async function OperacaoPage() {
+type OperacaoSearchParams = Record<string, string | string[] | undefined>;
+
+export default async function OperacaoPage({
+  searchParams,
+}: {
+  searchParams: Promise<OperacaoSearchParams>;
+}) {
+  const sp = await searchParams;
+  const filtros: FiltrosOperacao = {
+    meses: parseMulti(sp.mes),
+    transportadoras: parseMulti(sp.transportadora),
+    regioes: parseMulti(sp.regiao),
+    tipos: parseMulti(sp.tipo),
+  };
+  const filtroAtivo = Boolean(filtros.meses || filtros.transportadoras || filtros.regioes || filtros.tipos);
+
   let data: OperacaoData | null = null;
   let erro: string | null = null;
   try {
-    data = await getOperacaoData();
+    data = await getOperacaoData(filtros);
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
@@ -210,6 +334,16 @@ export default async function OperacaoPage() {
   const janelas = data?.janelas ?? [];
   const janelaCarriers = data?.janelaCarriers ?? [];
   const cidades = data?.cidades ?? [];
+  const opcoesMeses = data?.opcoesMeses ?? [];
+  const opcoesRegioes = data?.opcoesRegioes ?? [];
+  const opcoesTipos = data?.opcoesTipos ?? [];
+
+  const filterDimensions: FilterDimension[] = [
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: fmtMes },
+    { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
+    { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
+    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+  ];
 
   const kpiTiles: [string, string, string][] = kpis
     ? [
@@ -256,8 +390,10 @@ export default async function OperacaoPage() {
             <h1>Operação — Controle Operacional de Carregamento</h1>
             <p>
               Quem está carregando, quando (Meio-dia × Tarde) e em quais cidades — agregado sobre{" "}
-              <b>toda a base de contratações cruzadas a uma cotação</b> (sem filtro de dia, sem filtro
-              global nesta etapa da migração).
+              <b>toda a base de contratações cruzadas a uma cotação</b>. A seção &quot;Meio-dia ×
+              Tarde&quot; já aceita os filtros de Mês, Transportadora Contratada, Região Comercial e
+              Tipo Cliente (Fase 1 do motor de filtro global); as demais seções desta página ainda
+              mostram sempre a base completa, sem filtro.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
@@ -345,14 +481,15 @@ export default async function OperacaoPage() {
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
                 &quot;Frete mín.&quot; = piso OBSERVADO na base (ESTIMATIVA estatística, não a tabela oficial da
                 transportadora — ver <code>docs/frete-minimo-observado-2026-09.md</code>). Sem selo &quot;·
-                obs.&quot; = sem parâmetro disponível ainda.
+                obs.&quot; = sem parâmetro disponível ainda. Esta tabela mostra sempre a base completa (não
+                reage ao filtro abaixo).
               </div>
             </section>
 
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Distribuição do frete contratado</h2>
-                <div className="desc">participação de cada transportadora no total contratado (toda a base cruzada)</div>
+                <div className="desc">participação de cada transportadora no total contratado (toda a base cruzada, sem filtro)</div>
               </div>
               <div className="card">
                 <div className="dist-bar">
@@ -390,8 +527,28 @@ export default async function OperacaoPage() {
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Meio-dia × Tarde</h2>
-                <div className="desc">janela de contratação — toda a base cruzada, agrupada em 2 baldes fixos</div>
+                <div className="desc">
+                  janela de contratação, agrupada em 2 baldes fixos &middot; [TASK-29] motor de filtro global —
+                  única seção desta página que reage aos filtros abaixo (ver comentário no topo do arquivo)
+                </div>
               </div>
+              {/* Motor de filtro global — Fase 1, continuação /operacao. Fica
+                  só dentro desta seção de propósito: é a única RPC desta
+                  página (operacao_por_janela) que já suporta os 4 parâmetros
+                  — colocar o filtro fora daqui sugeriria que "Quem está
+                  carregando"/"Distribuição"/"Cidade × Transportadora"
+                  também reagem, o que ainda não é verdade. */}
+              <Suspense fallback={<div className="filterbar" />}>
+                <FilterBar dimensions={filterDimensions} />
+              </Suspense>
+              {filtroAtivo && (
+                <div className="cov-note">
+                  Os 5 números de cada card abaixo (contratações/romaneios/pedidos/peso/cubagem/frete) já
+                  refletem o filtro acima. O &quot;top 3 transportadoras&quot; dentro de cada card ainda mostra a
+                  distribuição da <b>base completa</b> daquela janela (a function que alimenta o ranking ainda
+                  não tem os 4 parâmetros do filtro) — próxima etapa, não bug.
+                </div>
+              )}
               <div className="grid cols-auto">
                 {JANELAS_FIXAS.map((jname) => {
                   const j = janelaByName.get(jname);
@@ -474,8 +631,8 @@ export default async function OperacaoPage() {
               <div className="bloc-head">
                 <h2>Cidade × Transportadora</h2>
                 <div className="desc">
-                  top 15 cidades por frete contratado total &middot; cor da diferença classifica a magnitude sobre o
-                  frete da própria linha, não julga a decisão
+                  top 15 cidades por frete contratado total (toda a base, sem filtro) &middot; cor da diferença
+                  classifica a magnitude sobre o frete da própria linha, não julga a decisão
                 </div>
               </div>
               <div className="table-scroll">
