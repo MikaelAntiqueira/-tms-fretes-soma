@@ -28,8 +28,8 @@
 - ✅ **chartPeso** — bins fixos `PESO_BINS` (0–10/10–25/.../1000+), raio `min(28, 5+sqrt(n)*1.6)`, média de frete por bin. Confere com `renderPeso` linha ~2115-2136.
 - ✅ **chartPrazo** — média de frete por prazo contratado (RPC `financeiro_prazo_frete_medio`, não este `chartPrazo` de "Prazo x Frete Médio Financeiro" — não confundir com `chartQuadrante`/`PrecoPrazoChart.tsx`, que é outro gráfico). Confere com `renderPrazo` linha ~2162-2173.
 - ✅ **tblCbmCusto** — RPC `financeiro_cubagem_custo()`: agrupa por faixa de cubagem fixa + "Não informado", soma peso/cbm/frete, KPI "custo/kg geral" sobre TODAS as faixas e "custo/m³ geral" EXCLUINDO "Não informado" — replica exatamente `renderCubagemCusto` linha ~2719-2747 (inclusive a assimetria kg-geral-inclui-tudo vs. m³-geral-exclui-não-informado).
-- 🔴 **tblOutliers (DIVERGE — corrigido, bloqueado por permissão)** — RPC `financeiro_outliers_peso()` usava `percentile_cont` (interpolação linear) para Q1/Q3/mediana; o Artifact original usa `sorted[Math.floor(n*0.25)]`/`[...0.75)]`/`[...0.5)]` — **percentil por índice (nearest-rank), sem interpolação** (`renderPeso` linha ~2143-2146). Testado direto no banco: na faixa "1.000kg+" (n=15, a faixa mais sensível — é onde vivem os maiores fretes individuais), Q1 muda de R$ 663,55 (índice) para R$ 834,54 (interpolado), ~20% de diferença, o que muda o limiar de outlier (Q3+1,5×IQR: R$ 5.833 vs R$ 5.427) e pode incluir/excluir processos da lista de outliers de forma diferente do original. Nas faixas com amostra maior (0–500kg) a diferença é desprezível — o problema é concentrado nas faixas pequenas, que são justamente as de maior valor unitário.
-  - **Correção já escrita e testada** (ver bloco SQL abaixo) — troca `percentile_cont` pelo índice exato via `array_agg(...)[floor(n*p)::int + 1]`. `apply_migration` foi negado pelo classificador de permissões ("Modify Shared Resources") nesta sessão — precisa rodar com aprovação humana ou de uma sessão com essa permissão liberada.
+- ✅ **tblOutliers (RESOLVIDO 2026-09-14)** — RPC `financeiro_outliers_peso()` usava `percentile_cont` (interpolação linear) para Q1/Q3/mediana; o Artifact original usa `sorted[Math.floor(n*0.25)]`/`[...0.75)]`/`[...0.5)]` — **percentil por índice (nearest-rank), sem interpolação** (`renderPeso` linha ~2143-2146). Testado direto no banco: na faixa "1.000kg+" (n=15, a faixa mais sensível — é onde vivem os maiores fretes individuais), Q1 mudava de R$ 663,55 (índice) para R$ 834,54 (interpolado), ~20% de diferença, o que mudava o limiar de outlier (Q3+1,5×IQR) e podia incluir/excluir processos da lista de outliers de forma diferente do original. Nas faixas com amostra maior (0–500kg) a diferença era desprezível — o problema era concentrado nas faixas pequenas, que são justamente as de maior valor unitário.
+  - **Corrigido e aplicado** (migration `fix_financeiro_outliers_peso_percentil_por_indice`, SQL abaixo — mesma já escrita/revisada aqui, só estava bloqueada por permissão de ferramenta numa sessão anterior). Validado: função roda sem erro, medianas recalculadas (ex.: faixa 500–1.000kg: R$511,30 → R$515,80).
 
 ```sql
 create or replace function public.financeiro_outliers_peso()
@@ -65,7 +65,7 @@ language sql stable set search_path = 'public' as $$
   order by b.frete_contratado desc limit 10;
 $$;
 ```
-  - Achado menor (cosmético, não corrigido): a coluna "Peso (kg)" da tabela usa `fmtNum` (`src/app/financeiro/page.tsx:565`) em vez de um `fmtKg` com sufixo " kg" como o resto do app — mostra "994" em vez de "994,6 kg". Não é erro de dado, só falta o sufixo de unidade.
+  - Achado menor (cosmético, ainda não corrigido): a coluna "Peso (kg)" da tabela usa `fmtNum` (`src/app/financeiro/page.tsx:565`) em vez de um `fmtKg` com sufixo " kg" como o resto do app — mostra "994" em vez de "994,6 kg". Não é erro de dado, só falta o sufixo de unidade.
 
 ## Transportadoras — "Comparativo" (`ComparativoCharts.tsx` + `tblTransp`)
 
@@ -157,9 +157,9 @@ qualquer tentativa.
 
 | Resultado | Qtd | Itens |
 |---|---|---|
-| ✅ CONFERE | 18 | chartDiffPrazo/Uf/Transp/Tipo, chartPeso/chartPrazo, tblCbmCusto, chartQuadrante, chartUf, chartClientes, tblCidades, opQuem, opCidades, ontTabela, + % Vezes Contratada de tblTransp |
+| ✅ CONFERE | 19 | chartDiffPrazo/Uf/Transp/Tipo, chartPeso/chartPrazo, tblCbmCusto, chartQuadrante, chartUf, chartClientes, tblCidades, opQuem, opCidades, ontTabela, tblOutliers (corrigido 14/09), + % Vezes Contratada de tblTransp |
 | ⚠️ Incerto (sem referência suficiente) | 1 | tblPrazoHist (percentil pode ou não bater com o pipeline Python original) |
-| 🔴 DIVERGE (achado real, não corrigido) | 2 | tblOutliers (percentil por índice vs interpolado); % Vezes Mais Barata de tblTransp |
-| 🔴🔴 QUEBRADO (página inteira sem dado) | 1 (afeta 2 itens) | tblOportunidades + chartClassif (task #2) — view `comparacoes` não existe |
+| 🔴 DIVERGE (achado real, não corrigido) | 1 | % Vezes Mais Barata de tblTransp — investigado (task #9), causa raiz não confirmada, deprioritizado pelo Mikael |
+| 🔴🔴 QUEBRADO (página inteira sem dado) | 1 (afeta 2 itens) — RESOLVIDO 14/09 | tblOportunidades + chartClassif (task #2) — view `comparacoes` não existia, reconstruída sobre v_ontem_comparacao |
 
 Achado menor (cosmético): coluna "Peso" de `tblOutliers` sem sufixo " kg" (usa `fmtNum` em vez de `fmtKg`).

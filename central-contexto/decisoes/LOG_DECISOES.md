@@ -163,3 +163,29 @@ ou agregação) — não precisaram de mudança.
 positiva — exatamente o baseline já documentado em PENDENTES.md ("494.417,43 / 6.915 / 5.194 /
 45.938,44"), que aparentemente já vinha de `v_cotacao_filtros`/`v_ontem_radar` (corretos) — a
 divergência estava só no lado de `v_ontem_comparacao`.
+
+## D-23 — v_cotacao_filtros sem security_invoker=true corrigido (achado ERROR do advisor Supabase)
+
+**Decisão**: `v_cotacao_filtros` (usada por `/financeiro`, `transportadoras_comparativo`,
+`financeiro_filtro_opcoes*`) era a única view do schema sem `security_invoker=true` — as demais
+já tinham sido corrigidas em `fix_views_security_invoker` (12/09). Provavelmente um
+`CREATE OR REPLACE VIEW` posterior (ligado às fases do Filtro Global) recriou a view sem repetir
+a cláusula `WITH`, que não é preservada automaticamente. Corrigido recriando a view com a mesma
+definição (via `pg_get_viewdef` antes de editar) + `WITH (security_invoker = true)`.
+
+**Motivo**: sem isso, a view rodava com o dono (bypassa RLS) em vez do usuário que consulta —
+ou seja, qualquer chamada com só a chave anon (sem login) conseguia ler
+cotacoes/clientes/contratacoes/ofertas/transportadoras através desse endpoint específico, mesmo
+com as 5 tabelas restritas a `authenticated` desde 12/09 e o middleware redirecionando visitantes
+pra `/login`. Advisor de segurança do Supabase confirmou, depois da correção, que nenhuma view do
+schema falta esse ajuste.
+
+## D-24 — financeiro_outliers_peso corrigido (percentil por índice, não interpolado)
+
+**Decisão**: aplicada a correção já escrita e revisada por outra sessão (Hermes) mas bloqueada
+lá por permissão de ferramenta — troca `percentile_cont` (interpolação) por percentil por índice
+(nearest-rank, `array_agg(...)[floor(n*p)::int+1]`), igual ao `renderPeso` do Artifact original.
+
+**Motivo**: na faixa "1.000kg+" a diferença chegava a ~20% no Q1, podendo incluir/excluir
+processos da lista de outliers de forma diferente do original. Detalhe completo em
+`VALIDACAO_23_ITENS.md`.
