@@ -8,6 +8,7 @@ import { TransportadorasTabs } from "./TransportadorasTabs";
 import { PrecoPrazoChart, type PrazoMedioRow } from "./PrecoPrazoChart";
 import { RegiaoComercialChart, type RegiaoComercialRow } from "./RegiaoComercialChart";
 import { ClientesChart, type ClienteMetricaRow } from "./ClientesChart";
+import { fmtMes, parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedio, clsDifSobreFrete, confiabilidade } from "@/lib/format";
 
 // Página "Transportadoras & Cidades" — sub-abas "Comparativo" (TASK-29
 // continuação, 2026-09-11, inalterada nesta etapa), "Preço × Prazo",
@@ -291,83 +292,7 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
   return { comparativo, quadrante, prazoHist, regiaoComercial, clientes, cidades };
 }
 
-function fmtBRL(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-}
-function fmtBRL2(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-// Mesma regra de src/app/operacao/page.tsx: 0 (sem diferença) também vira
-// "—", não "R$ 0" — só existe sinal +/- quando há diferença de fato.
-function fmtBRLSigned(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v) || v === 0) return "—";
-  const s = Math.abs(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-  return v > 0 ? `+${s}` : `-${s}`;
-}
-function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-// "Prazo méd." da aba Cidades: mesmo formato do Artifact original
-// (`(r.prz/r.prn).toFixed(1)+' d'` — ponto decimal fixo, não localizado pt-BR
-// — validado campo a campo contra o Artifact v42, ver comentário do topo).
-function fmtPrazoMedio(v: number | null, n: number): string {
-  if (n <= 0 || v == null || Number.isNaN(v)) return "—";
-  return `${v.toFixed(1)} d`;
-}
-
-// Lê um parâmetro de URL no formato "valor1,valor2" — mesma function de
-// src/app/financeiro/page.tsx.
-function parseMulti(raw: string | string[] | undefined): string[] | null {
-  if (!raw) return null;
-  const joined = Array.isArray(raw) ? raw.join(",") : raw;
-  const values = joined
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return values.length > 0 ? values : null;
-}
-
-// Porta `fmtMes` do Artifact original / mesma function de /financeiro:
-// "2026-07" -> "jul/2026".
-function fmtMes(iso: string): string {
-  const [y, m] = iso.split("-");
-  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const idx = parseInt(m, 10) - 1;
-  return `${nomes[idx] ?? "?"}/${y}`;
-}
-
-// Classifica a magnitude da diferença sobre o frete DA PRÓPRIA LINHA (não
-// sobre a menor cotação, como em /ontem) — regra exata do Artifact de
-// referência (`_sevColor`/`clsDifSobreFrete`), idêntica à já portada em
-// src/app/operacao/page.tsx para a tabela Cidade x Transportadora.
-function clsDifSobreFrete(diff: number, frete: number): "" | "good" | "warning" | "serious" | "critical" {
-  if (diff <= 0) return "good";
-  const pct = frete > 0 ? diff / frete : 0;
-  if (pct > 0.15) return "critical";
-  if (pct > 0.05) return "serious";
-  return "warning";
-}
-
-// Confiabilidade da mediana/média de prazo por transportadora — mesma
-// regra do Artifact original (renderPrazoHist): n>=100 = "boa" (sem cor
-// especial), n>=30 = "amostra pequena" (--warning), senão = "insuficiente
-// para conclusão" (--critical). Reaproveita as classes `.pill.laranja`
-// (--warning) e `.pill.n` (--critical) já existentes em globals.css — não
-// precisa de CSS novo.
-function confiabilidade(n: number): { label: string; pillClass: string | null } {
-  if (n >= 100) return { label: "boa", pillClass: null };
-  if (n >= 30) return { label: "⚠️ amostra pequena", pillClass: "pill laranja" };
-  return { label: "⚠️ insuficiente para conclusão", pillClass: "pill n" };
-}
-
-// Filtros da Fase 2 do motor de filtro global — mesma convenção de
+// Filtros da Fase 2 do motor de filtro global
 // src/app/financeiro/page.tsx (`null` numa dimensão = sem filtro nela).
 interface FiltrosTransp {
   meses: string[] | null;

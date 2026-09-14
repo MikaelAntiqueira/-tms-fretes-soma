@@ -3,6 +3,7 @@ import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Suspense } from "react";
 import { OportunidadesTabsClient } from "./OportunidadesTabsClient";
+import { fmtMes, parseMulti, clsDifSobreFrete, fmtBRL, fmtNum, fmtPct } from "@/lib/format";
 
 // Página "Oportunidades" — sub-abas:
 //   1. Classificação  (🔴🟠🔵🟢⚠️ — tabela + KPIs)
@@ -76,37 +77,8 @@ export interface ComparacaoRow {
 }
 
 // ---------------------------------------------------------------------------
-// Formatação
+// Formatação (centralizada em @/lib/format)
 // ---------------------------------------------------------------------------
-function fmtBRL(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-function fmtMes(iso: string): string {
-  const [y, m] = iso.split("-");
-  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const idx = parseInt(m, 10) - 1;
-  return `${nomes[idx] ?? "?"}/${y}`;
-}
-function parseMulti(raw: string | string[] | undefined): string[] | null {
-  if (!raw) return null;
-  const joined = Array.isArray(raw) ? raw.join(",") : raw;
-  const values = joined.split(",").map((v) => v.trim()).filter(Boolean);
-  return values.length > 0 ? values : null;
-}
 
 // ---------------------------------------------------------------------------
 // Server-side: busca dados da view comparacoes via PostgREST
@@ -131,7 +103,7 @@ async function fetchComparacoes(filtros: {
   const filterParts: string[] = [];
 
   if (filtros.meses && filtros.meses.length > 0) {
-    const conditions = filtros.meses.map((m) => `data_contratacao~"${m}-"`);
+    const conditions = filtros.meses.map((m) => `data_contratacao~\"${m}-\"`);
     filterParts.push(`(${conditions.join(" or ")})`);
   }
   if (filtros.transportadoras && filtros.transportadoras.length > 0) {
@@ -162,9 +134,11 @@ async function fetchComparacoes(filtros: {
   let filtered = data ?? [];
   if (filter) {
     filtered = filtered.filter((row) => {
-      // data_contratacao~"2026-07" → começa com o mês
+      // data_contratacao~\"2026-07\" → começa com o mês (proteção contra null)
       if (filtros.meses && filtros.meses.length > 0) {
-        const mesMatch = filtros.meses.some((m) => (row.data_contratacao as string).startsWith(m));
+        const dc = row.data_contratacao as string | null | undefined;
+        if (dc == null || dc === "") return false;
+        const mesMatch = filtros.meses.some((m) => dc.startsWith(m));
         if (!mesMatch) return false;
       }
       if (filtros.transportadoras && filtros.transportadoras.length > 0) {
@@ -247,7 +221,7 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
         <header className="app-header">
           <div className="app-header-inner">
             <div>
-              <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
+              <div className="eyebrow">TMS Fretes · grupo SOMA/RS</div>
               <h1>Oportunidades</h1>
               <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
             </div>
@@ -310,7 +284,7 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
       <header className="app-header">
         <div className="app-header-inner">
           <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
+            <div className="eyebrow">TMS Fretes · grupo SOMA/RS</div>
             <h1>Oportunidades</h1>
             <p className="desc" style={{ marginTop: 4, color: "var(--text-muted)", fontSize: 14 }}>
               Classificação de oportunidades de economia por impacto.

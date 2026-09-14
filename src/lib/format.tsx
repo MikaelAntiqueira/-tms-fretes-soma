@@ -67,13 +67,6 @@ export function fmtDate(iso: string | null | undefined): string {
 }
 
 /** Formata peso em kg com 1 casa decimal */
-export function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-/** Formata peso em kg com 1 casa decimal */
 export function fmtKg(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "—";
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";

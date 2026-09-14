@@ -251,56 +251,11 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
   return { kpis, carriers, janelas, janelaCarriers, cidades, opcoesMeses, opcoesRegioes, opcoesTipos };
 }
 
-function fmtBRL(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-}
-function fmtBRLSigned(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v) || v === 0) return "—";
-  const s = Math.abs(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-  return v > 0 ? `+${s}` : `-${s}`;
-}
-function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-// Porta `fmtMes` do Artifact original / mesma function de /financeiro:
-// "2026-07" -> "jul/2026".
-function fmtMes(iso: string): string {
-  const [y, m] = iso.split("-");
-  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const idx = parseInt(m, 10) - 1;
-  return `${nomes[idx] ?? "?"}/${y}`;
-}
-
-// Lê um parâmetro de URL no formato "valor1,valor2" — mesma function de
-// src/app/financeiro/page.tsx (duplicada aqui de propósito, mesmo padrão já
-// usado no resto do repo para pequenos helpers por página).
-function parseMulti(raw: string | string[] | undefined): string[] | null {
-  if (!raw) return null;
-  const joined = Array.isArray(raw) ? raw.join(",") : raw;
-  const values = joined
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return values.length > 0 ? values : null;
-}
+import { fmtBRL, fmtBRLSigned, fmtNum, fmtPct, fmtMes, parseMulti, clsDifSobreFrete } from "@/lib/format";
 
 // Classifica a magnitude da diferença sobre o frete DA PRÓPRIA LINHA (não
 // sobre a menor cotação, como em /ontem) — regra exata do Artifact de
-// referência para a tabela Cidade x Transportadora.
-function clsDifSobreFrete(diff: number, frete: number): "" | "good" | "warning" | "serious" | "critical" {
-  if (diff <= 0) return "good";
-  const pct = frete > 0 ? diff / frete : 0;
-  if (pct > 0.15) return "critical";
-  if (pct > 0.05) return "serious";
-  return "warning";
-}
-
+// referência para a tabela Cidade x Transportadora (já em @/lib/format).
 function CarrierDot({ t }: { t: string }) {
   return <span className="carrier-dot" style={{ background: carrierColor(t) }} />;
 }

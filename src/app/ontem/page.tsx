@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
+import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
 // Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
 // contratação cruzada a uma cotação. Porta, linha a linha, a lógica de
@@ -447,43 +448,7 @@ async function getOntemData(): Promise<OntemData> {
   return { ref, kpis, linhas, cobertura, radar, tendencia };
 }
 
-// ---- formatação — reproduz fmtBRL/fmtPct/fmtNum/fmtDate do Artifact original
-// (mesma locale pt-BR, mesmas casas decimais), para não deslocar nenhum
-// número por causa de arredondamento diferente entre JS e o Artifact. ----
-function fmtBRL(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-}
-function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-// Mesma classificação de cor da célula de diferença do Artifact original
-// (`clsDif`): nunca classifica a decisão, só a magnitude da diferença %.
-function clsDif(dr: number | null, dp: number | null): "" | "good" | "warning" | "serious" | "critical" {
-  if (dr == null) return "";
-  if (dr <= 0) return "good";
-  if (dp == null || dp <= 0.05) return "warning";
-  if (dp <= 0.15) return "serious";
-  return "critical";
-}
-
-function EscPill({ e }: { e: "S" | "N" | "SC" }) {
-  if (e === "S") return <span className="pill s">Sim</span>;
-  if (e === "N") return <span className="pill n">Não</span>;
-  if (e === "SC") return <span className="pill sc">Sem comp.</span>;
-  return <>—</>;
-}
+// Cobertura do dia
 
 function CoberturaNote({ c }: { c: OntemCobertura | null }) {
   if (!c || c.amostra_insuficiente) return null;

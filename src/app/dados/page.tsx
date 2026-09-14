@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref } from "@/lib/format";
 
 // Página "Dados" (rodapé do Artifact original, c0abf79e-... v42) — a única
 // das 10 tabelas do Artifact com busca + paginação reais (`tblDetalhe`).
@@ -102,41 +103,6 @@ async function getDadosDetalhe(opts: { q: string; sort: SortColumn; dir: "asc" |
   return { rows, totalCount };
 }
 
-// ---- formatação — mesma convenção pt-BR já usada nas demais páginas ----
-function fmtBRL2(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function fmtKg(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-// Porta `fmtMes` do Artifact original / mesma function de /financeiro,
-// /operacao, /transportadoras, /oportunidades: "2026-07" -> "jul/2026".
-function fmtMes(iso: string): string {
-  const [y, m] = iso.split("-");
-  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const idx = parseInt(m, 10) - 1;
-  return `${nomes[idx] ?? "?"}/${y}`;
-}
-function clsDif(dr: number | null, dp: number | null): "" | "good" | "warning" | "serious" | "critical" {
-  if (dr == null) return "";
-  if (dr <= 0) return "good";
-  if (dp == null || dp <= 0.05) return "warning";
-  if (dp <= 0.15) return "serious";
-  return "critical";
-}
-function EscPill({ e }: { e: "S" | "N" | "SC" }) {
-  if (e === "S") return <span className="pill s">Sim</span>;
-  if (e === "N") return <span className="pill n">Não</span>;
-  if (e === "SC") return <span className="pill sc">Sem comp.</span>;
-  return <>—</>;
-}
-
 const COLUMNS: { key: SortColumn | null; label: string; num?: boolean }[] = [
   { key: null, label: "Romaneio" },
   { key: null, label: "Pedido" },
@@ -154,15 +120,6 @@ const COLUMNS: { key: SortColumn | null; label: string; num?: boolean }[] = [
   { key: null, label: "Prazo" },
   { key: "dia", label: "Mês" },
 ];
-
-function buildHref(base: { q: string; sort: SortColumn; dir: "asc" | "desc"; page: number }): string {
-  const params = new URLSearchParams();
-  if (base.q) params.set("q", base.q);
-  params.set("sort", base.sort);
-  params.set("dir", base.dir);
-  params.set("page", String(base.page));
-  return `/dados?${params.toString()}`;
-}
 
 type DadosSearchParams = Record<string, string | string[] | undefined>;
 
@@ -196,7 +153,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
             <h1>Dados</h1>
             <p>
               Tabela detalhada, 1 linha por processo de cotação — busca por cliente, pedido, NF ou
-              romaneio, ordenação por coluna, paginação server-side (a mesma tabela &quot;Dados&quot;
+              romaneio, ordenação por coluna, paginação server-side (a mesma tabela "Dados"
               do Artifact atual, agora lendo direto do Supabase).
             </p>
             <nav className="crumbs">
@@ -219,10 +176,6 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
               <div className="desc" id="tblCount">
                 {totalCount.toLocaleString("pt-BR")} processos {q ? `encontrados para "${q}"` : "no total"}
               </div>
-              {/* Busca client-independente: GET simples pra /dados, sem JS —
-                  mesmo efeito do `<input id="tblSearch">` do Artifact original
-                  (filtra por cliente/pedido/NF/romaneio), sempre volta pra
-                  página 1 ao buscar. */}
               <form action="/dados" method="get" style={{ display: "flex", gap: 8 }}>
                 <input type="hidden" name="sort" value={sort} />
                 <input type="hidden" name="dir" value={dir} />
@@ -334,7 +287,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
             </div>
 
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
-              Coluna &quot;Valor Declarado&quot; do Artifact original não existe em nenhuma tabela do
+              Coluna "Valor Declarado" do Artifact original não existe em nenhuma tabela do
               schema atual (cotações/contratações/ofertas/clientes) — não portada, nunca preenchida
               com valor estimado ([R-DADO]).
             </div>

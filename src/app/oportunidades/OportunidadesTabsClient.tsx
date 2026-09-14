@@ -5,6 +5,7 @@ import type { ComparacaoRow } from "./page";
 import { ClassificacaoChart } from "@/components/ClassificacaoChart";
 
 // Componente de tabs (client-side state para alternar entre abas)
+// CORRIGIDO: trata valores null de forma segura para evitar crash
 function OportunidadesTabsClient({
   rows,
   classificacaoRows,
@@ -20,6 +21,7 @@ function OportunidadesTabsClient({
 }) {
   const [activeTab, setActiveTab] = useState<"classificacao" | "clientes">("classificacao");
 
+  // Contagens com proteção (classif pode ser null)
   const verdeCount = rows.filter((r) => r.classif === "verde").length;
   const vermelhoCount = rows.filter((r) => r.classif === "vermelho").length;
   const laranjaCount = rows.filter((r) => r.classif === "laranja").length;
@@ -66,11 +68,22 @@ function OportunidadesTabsClient({
     clienteMap.set(key, entry);
   }
 
+  // Cálculo de diffMedio após o loop — média por cliente
+  for (const [key, entry] of clienteMap) {
+    entry.diffMedio = entry.qtd > 0 ? entry.diffTotal / entry.qtd : null;
+  }
+
   const clientesSorted = [...clienteMap.values()]
     .filter((c) => c.diffTotal > 0)
     .sort((a, b) => b.diffTotal - a.diffTotal);
 
   const total = rows.length;
+
+  // Safe helper para classificar display name
+  const classifDisplayName = (c: string | null | undefined) => {
+    if (!c) return "—";
+    return c.charAt(0).toUpperCase() + c.slice(1);
+  };
 
   return (
     <>
@@ -133,7 +146,7 @@ function OportunidadesTabsClient({
                           <tr key={c}>
                             <td>
                               <span className="classif-badge-sm" style={{ backgroundColor: colors[c] ?? "#9ca3af" }}>
-                                {c.charAt(0).toUpperCase() + c.slice(1)}
+                                {classifDisplayName(c)}
                               </span>
                             </td>
                             <td className="num">{count}</td>
@@ -206,10 +219,12 @@ function OportunidadesTabsClient({
                         </td>
                         <td className="num">{r.diffP != null ? `${(r.diffP * 100).toFixed(1)}%` : "—"}</td>
                         <td>
-                          {r.classif && (
+                          {r.classif ? (
                             <span className="classif-badge-sm" style={{ backgroundColor: colors[r.classif] ?? "#9ca3af" }}>
-                              {r.classif.charAt(0).toUpperCase() + r.classif.slice(1)}
+                              {classifDisplayName(r.classif)}
                             </span>
+                          ) : (
+                            "—"
                           )}
                         </td>
                         <td>{r.risco_prazo_alt ? "⚠️ Sim" : "—"}</td>
@@ -220,7 +235,7 @@ function OportunidadesTabsClient({
                 </table>
                 {classificacaoRows.length > 50 && (
                   <p className="nota-mais-registros" style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-                    Mostrando os 50 maiores impactos. Existem{" "}
+                    Mostrando os 50 maiores impactos. Existem{ " "}
                     {classificacaoRows.length - 50} registros adicionais — filtre por mês, transportadora ou região
                     para explorar.
                   </p>

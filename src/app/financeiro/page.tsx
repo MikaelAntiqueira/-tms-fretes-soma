@@ -557,43 +557,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   };
 }
 
-function fmtBRL(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-}
-function fmtBRL2(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function fmtNum(v: number | null | undefined, d = 0): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-}
-function fmtPct(v: number | null | undefined, d = 1): string {
-  if (v == null || Number.isNaN(v)) return "—";
-  return (v * 100).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }) + "%";
-}
-// Porta `fmtMes` do Artifact original: "2026-07" -> "jul/2026".
-function fmtMes(iso: string): string {
-  const [y, m] = iso.split("-");
-  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const idx = parseInt(m, 10) - 1;
-  return `${nomes[idx] ?? "?"}/${y}`;
-}
-
-// Lê um parâmetro de URL no formato "valor1,valor2" e devolve a lista de
-// valores (trim + descarta vazios), ou `null` se o parâmetro não veio —
-// `null` é a convenção de "sem filtro nessa dimensão" usada em toda a
-// cadeia (URL -> page.tsx -> RPC -> SQL, default null = todos).
-function parseMulti(raw: string | string[] | undefined): string[] | null {
-  if (!raw) return null;
-  const joined = Array.isArray(raw) ? raw.join(",") : raw;
-  const values = joined
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return values.length > 0 ? values : null;
-}
+import { fmtMes, parseMulti, fmtBRL, fmtBRL2, fmtNum, fmtPct } from "@/lib/format";
 
 type FinanceiroSearchParams = Record<string, string | string[] | undefined>;
 

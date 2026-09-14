@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { fmtNum, fmtBRL2 } from "@/lib/format";
 
 // Página sempre busca dado fresco — é só uma prova de conceito de conexão
 // com o Supabase, não tem cache a gerenciar ainda.
@@ -45,13 +46,7 @@ async function getKpis(): Promise<Kpis> {
   };
 }
 
-function formatInt(n: number) {
-  return n.toLocaleString("pt-BR");
-}
 
-function formatBRL(n: number) {
-  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
 
 export default async function Home() {
   let kpis: Kpis | null = null;
@@ -98,7 +93,7 @@ export default async function Home() {
                 <div className="kpi-card">
                   <span className="badge">FATO</span>
                   <div className="lbl">Total de Cotações</div>
-                  <div className="val mono">{formatInt(kpis.totalCotacoes)}</div>
+                  <div className="val mono">{fmtNum(kpis.totalCotacoes)}</div>
                   <div className="note">
                     Uma linha por sessão de cotação (Enviado↔Recebido casados
                     por chave estável). Tabela <code>cotacoes</code>.
@@ -108,7 +103,7 @@ export default async function Home() {
                 <div className="kpi-card">
                   <span className="badge">FATO</span>
                   <div className="lbl">Total de Contratações</div>
-                  <div className="val mono">{formatInt(kpis.totalContratacoes)}</div>
+                  <div className="val mono">{fmtNum(kpis.totalContratacoes)}</div>
                   <div className="note">
                     Export &quot;Contratados&quot; do painel Frete Rápido.
                     Tabela <code>contratacoes</code>.
@@ -118,7 +113,7 @@ export default async function Home() {
                 <div className="kpi-card">
                   <span className="badge">DADO DERIVADO</span>
                   <div className="lbl">Contratações Cruzadas com Cotação</div>
-                  <div className="val mono">{formatInt(kpis.contratacoesCruzadas)}</div>
+                  <div className="val mono">{fmtNum(kpis.contratacoesCruzadas)}</div>
                   <div className="note">
                     Contratações com <code>cotacao_id</code> preenchido — cerca
                     de 1/3 da operação cruza uma cotação (cobertura estrutural,
@@ -129,7 +124,7 @@ export default async function Home() {
                 <div className="kpi-card">
                   <span className="badge">INDICADOR</span>
                   <div className="lbl">Frete Contratado (cruzadas)</div>
-                  <div className="val mono">{formatBRL(kpis.freteContratadoCruzadas)}</div>
+                  <div className="val mono">{fmtBRL2(kpis.freteContratadoCruzadas)}</div>
                   <div className="note">
                     Soma de <code>valor_frete_contratado</code> só das
                     contratações cruzadas — teste de aceitação desta etapa:

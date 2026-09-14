@@ -274,15 +274,15 @@ a {
 }
 
 main.content {
-  max-width: 960px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 32px 24px 64px;
+  padding: 32px 28px 64px;
   width: 100%;
   flex: 1;
 }
 
 main.content.wide {
-  max-width: 1320px;
+  max-width: 1600px;
 }
 
 .section-label {
@@ -460,7 +460,28 @@ section.bloc { margin-top: 34px; }
 .card h3 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
 .card .sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
 
-/* ---- KPI tiles ---- */
+/* ---- KPI tiles wide screen ---- */
+@media (min-width: 1400px) {
+  .grid.kpis { grid-template-columns: repeat(6, 1fr); }
+  .kpi { min-height: 100px; padding: 18px 20px; }
+  .kpi .val { font-size: 28px; }
+}
+
+/* ---- Tabela expandida para telas grandes ---- */
+@media (min-width: 1200px) {
+  table.data { font-size: 13px; }
+  table.data thead th { padding: 9px 12px; }
+  table.data tbody td { padding: 8px 12px; }
+}
+
+/* ---- Grid de 3 colunas para telas largas ---- */
+@media (min-width: 1200px) {
+  .grid.cols3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1400px) {
+  .grid.cols3 { grid-template-columns: repeat(4, 1fr); }
+}
 .kpi { display: flex; flex-direction: column; gap: 6px; min-height: 118px; position: relative; }
 .kpi .lbl {
   font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
