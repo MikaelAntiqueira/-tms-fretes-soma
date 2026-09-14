@@ -263,3 +263,53 @@ do Supabase; (2) `EXPLAIN ANALYZE` mostrando a redução de carga (a nova RPC ma
 erro não volta a aparecer em uso normal — se voltar, o próximo passo é olhar se `/oportunidades`
 (que não teve nenhum 500 nos logs das últimas 24h, diferente de `/operacao`) tem um padrão
 parecido de chamadas concorrentes sobre uma view cara.
+
+## D-27 — Causa raiz real do "This page couldn't load" universal: bug de tracing da Vercel com Next.js 16 + proxy.ts, não código do app
+
+**Decisão**: depois de aplicar [D-26], o Mikael reportou que "não tem nada funcionando" e as
+páginas mostravam a tela genérica da Vercel "This page couldn't load / A server error
+occurred" — em QUALQUER página, não só `/operacao`. Antes de aceitar essa hipótese como
+definitiva, testei tudo que dava pra testar sem precisar logar como usuário (login/senha nunca
+são inseridos por mim):
+
+1. **Logs do Supabase durante os erros relatados** (janelas 18:01, 18:09, 18:23): TODAS as
+   chamadas (header_stats, operacao_dashboard_estatico, operacao_por_janela, ontem_kpis,
+   radar_d2-d6, sum_frete_contratado_cruzadas, etc.) retornaram 200. Zero erro. Banco 100%
+   saudável durante o problema.
+2. **Build de produção local** (`npm run build`, clone do repo): compilou limpo, TypeScript
+   sem erro, todas as 10 rotas geradas.
+3. **Parsing dos dados** (`getOperacaoData` de `/operacao`, extraída e testada isoladamente com
+   os dados REAIS capturados do Postgres via `execute_sql`, sem precisar de sessão): rodou sem
+   nenhuma exceção, valores corretos.
+
+Isso eliminou banco, build e lógica de página como causa. Pesquisei o padrão exato do erro
+("This page couldn't load", intermitente, banco saudável, qualquer página) e encontrei um bug
+conhecido e documentado da própria Vercel: desde o Next.js 16, `src/proxy.ts` roda sempre em
+runtime Node.js (não é mais opcional escolher Edge, ver docs oficiais do Next 16). O
+rastreador de arquivos da Vercel (`@vercel/nft`) não empacota `node_modules/@swc/helpers/esm/*`
+nas funções Lambda — o pacote `@swc/helpers` tem um export condicional que aponta pra ESM em
+ambiente ESM, mas o `nft` só segue o branch CJS — então a função quebra ao dar `require` nesse
+módulo ausente, de forma intermitente (depende de qual caminho de código aquela invocação
+específica da Lambda precisa resolver). Casos idênticos relatados: `vercel/next.js#93852`
+(https://github.com/vercel/next.js/issues/93852) e Vercel Community #41956
+(https://community.vercel.com/t/iddleware-invocation-failed-middleware-lambda-missing-swc-helpers-on-next-16-2-4/41956)
+— mesmo sintoma (`MIDDLEWARE_INVOCATION_FAILED`/`FUNCTION_INVOCATION_FAILED` intermitente,
+"funcionava, parou sem ninguém mudar nada").
+
+**Correção** (commit `4b09b2ab` em `next.config.ts`): `outputFileTracingIncludes` forçando o
+`nft` a incluir `node_modules/@swc/helpers/esm/**` explicitamente. **Confirmado localmente**:
+rebuild depois da mudança mostra os 12 arquivos `.nft.json` (`middleware.js` + as 10 páginas +
+a rota do ícone) agora referenciando esses arquivos — antes da mudança, nenhum referenciava.
+
+**Motivo de registrar com detalhe**: [D-26] tinha corrigido um problema REAL (o timeout de
+`v_operacao_base`), mas não era a causa do "não tem nada funcionando" — dois problemas
+diferentes coexistindo na mesma investigação, um de banco (D-26) e um de infraestrutura de
+deploy (D-27). Lição para sessões futuras: quando os logs do Supabase estão 100% limpos durante
+um erro relatado pelo usuário, o problema não está no banco nem na lógica da página — está em
+alguma camada entre o build e o navegador (aqui, o empacotamento da função serverless).
+
+**Não verificado 100%**: não recebi confirmação do Mikael depois deste último deploy (o
+anterior, [D-26], ele confirmou que ainda dava erro). Próxima sessão: perguntar se o erro
+"This page couldn't load" parou de aparecer; se persistir, o próximo suspeito é o mesmo bug em
+outra função (nem toda função tem o mesmo padrão de import) — pode precisar também de
+`serverExternalPackages` ou abrir um ticket com o suporte da Vercel citando os issues acima.
