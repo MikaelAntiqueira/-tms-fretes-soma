@@ -272,11 +272,17 @@ interface FinanceiroData {
   cubagemCusto: CubagemCustoRow[];
   custoKgGeral: number | null;
   custoM3Geral: number | null;
+  opcoesMeses: string[];
+  opcoesTransportadoras: string[];
   opcoesRegioes: string[];
   opcoesTipos: string[];
-  opcoesCidades: string[];
   opcoesRomaneios: string[];
+  opcoesEsc: string[];
   opcoesPrazos: number[];
+  opcoesCidades: string[];
+  opcoesJanelas: string[];
+  opcoesFaixasPeso: string[];
+  opcoesFaixasCubagem: string[];
 }
 
 // Filtros do motor de filtro global — as 4 da Fase 1 + as 7 que faltavam
@@ -298,30 +304,10 @@ interface FiltrosVisaoGeral {
   faixasCubagem: string[] | null;
 }
 
-// Conjuntos fixos e pequenos (mesmo padrão de TRANSP_ORDER/JANELAS_FIXAS):
-// não precisam de ida ao banco, os rótulos vêm direto do CASE da migration.
-const ESC_OPTIONS = ["S", "N", "SC"];
+// Rótulo de exibição do valor bruto "esc" (S/N/SC) — as OPÇÕES do dropdown
+// em si vêm da cascata (financeiro_filtro_opcoes_cascata), não daqui; isto
+// só formata o valor já filtrado pelo cascade.
 const ESC_LABELS: Record<string, string> = { S: "Sim", N: "Não", SC: "Sem comparação" };
-const JANELA_OPTIONS = ["Meio-dia", "Tarde"];
-const FAIXA_PESO_OPTIONS = [
-  "0–10kg",
-  "10–25kg",
-  "25–50kg",
-  "50–100kg",
-  "100–250kg",
-  "250–500kg",
-  "500–1.000kg",
-  "1.000kg+",
-];
-const FAIXA_CUBAGEM_OPTIONS = ["<0,05 m³", "0,05–0,15 m³", "0,15–0,5 m³", "0,5–2 m³", "2+ m³", "Não informado"];
-
-// Lista fixa das 7 transportadoras, MESMA ordem usada em `transportadoras_
-// comparativo()` (cláusula `VALUES` da function) e no `TRANSP_ORDER` do
-// Artifact original — opções do dropdown "Transportadora Contratada" do
-// FilterBar. Não é uma query nova: evita ida ao banco só para listar 7
-// valores fixos e conhecidos (mesma decisão já usada em CARRIER_COLOR de
-// /operacao e /transportadoras).
-const TRANSP_ORDER = ["Fritz Express", "LKW", "Leomar", "Minuano", "Rede Nacional", "Santa Cruz", "São Miguel"];
 
 async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<FinanceiroData> {
   const supabase = await createSupabaseServerClient();
@@ -362,7 +348,12 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     supabase.rpc("operacao_por_janela", filtroArgs),
     supabase.rpc("transportadoras_comparativo", filtroArgs),
     // ---- opções completas (sem cascata) para os dropdowns Região/Tipo ----
-    supabase.rpc("financeiro_filtro_opcoes"),
+    // Cascata de opções [TASK-29] 2026-09-14: cada dimensão só mostra valores
+    // que ainda produzem >=1 resultado dado o estado das OUTRAS 10 dimensões
+    // ativas — porta rowMatchesFilters(i, exclude) do Artifact original. Por
+    // isso recebe o filtroArgs completo (a function ignora internamente o
+    // parâmetro da própria dimensão de cada lista que calcula).
+    supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
     // ---- demais sub-abas: FORA do escopo desta Fase 1, sempre base completa ----
     supabase.rpc("financeiro_evolucao_mensal"),
     supabase.rpc("financeiro_diff_n_esc_nao"),
@@ -447,13 +438,19 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     : null;
 
   const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+  const opcoesMeses: string[] = (opcoesRow?.meses as string[] | null) ?? [];
+  const opcoesTransportadoras: string[] = (opcoesRow?.transportadoras as string[] | null) ?? [];
   const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
   const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
-  const opcoesCidades: string[] = (opcoesRow?.cidades as string[] | null) ?? [];
   const opcoesRomaneios: string[] = (opcoesRow?.romaneios as string[] | null) ?? [];
+  const opcoesEsc: string[] = (opcoesRow?.escs as string[] | null) ?? [];
   // `prazos` volta como text[] da RPC (ver comentário da migration) — converte pra
   // number[] aqui, único lugar que precisa saber que prazo é numérico.
   const opcoesPrazos: number[] = ((opcoesRow?.prazos as string[] | null) ?? []).map(Number);
+  const opcoesCidades: string[] = (opcoesRow?.cidades as string[] | null) ?? [];
+  const opcoesJanelas: string[] = (opcoesRow?.janelas as string[] | null) ?? [];
+  const opcoesFaixasPeso: string[] = (opcoesRow?.faixas_peso as string[] | null) ?? [];
+  const opcoesFaixasCubagem: string[] = (opcoesRow?.faixas_cubagem as string[] | null) ?? [];
 
   const evolucaoRows = (evolucaoRes.data as Record<string, unknown>[]) ?? [];
   const evolucaoMensal: EvolucaoMesRow[] = evolucaoRows.map((r) => ({
@@ -546,11 +543,17 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     cubagemCusto,
     custoKgGeral,
     custoM3Geral,
+    opcoesMeses,
+    opcoesTransportadoras,
     opcoesRegioes,
     opcoesTipos,
-    opcoesCidades,
     opcoesRomaneios,
+    opcoesEsc,
     opcoesPrazos,
+    opcoesCidades,
+    opcoesJanelas,
+    opcoesFaixasPeso,
+    opcoesFaixasCubagem,
   };
 }
 
@@ -642,25 +645,34 @@ export default async function FinanceiroPage({
   const cubagemCusto = data?.cubagemCusto ?? [];
   const custoKgGeral = data?.custoKgGeral ?? null;
   const custoM3Geral = data?.custoM3Geral ?? null;
+  const opcoesMeses = data?.opcoesMeses ?? [];
+  const opcoesTransportadoras = data?.opcoesTransportadoras ?? [];
   const opcoesRegioes = data?.opcoesRegioes ?? [];
   const opcoesTipos = data?.opcoesTipos ?? [];
-  const opcoesCidades = data?.opcoesCidades ?? [];
   const opcoesRomaneios = data?.opcoesRomaneios ?? [];
+  const opcoesEsc = data?.opcoesEsc ?? [];
   const opcoesPrazos = data?.opcoesPrazos ?? [];
+  const opcoesCidades = data?.opcoesCidades ?? [];
+  const opcoesJanelas = data?.opcoesJanelas ?? [];
+  const opcoesFaixasPeso = data?.opcoesFaixasPeso ?? [];
+  const opcoesFaixasCubagem = data?.opcoesFaixasCubagem ?? [];
 
   // Opções do dropdown "Mês": todos os meses presentes na base (mesma lista
   // que `financeiro_evolucao_mensal()` já devolve, sem filtro nenhum — não
   // é uma query nova, só reaproveita o que a página já busca para a sub-aba
   // "Cotado × Contratado").
-  const mesesDisponiveis = [...new Set(evolucaoMensal.map((r) => r.mes))].sort();
-
+  // As 11 listas de opções vêm todas de financeiro_filtro_opcoes_cascata()
+  // (cascata real — cada uma já considera as outras 10 dimensões ativas).
+  // As constantes fixas que existiam antes (TRANSP_ORDER, ESC_OPTIONS,
+  // JANELA_OPTIONS, FAIXA_*_OPTIONS) foram removidas — ficaram redundantes
+  // e sem uso assim que a cascata passou a alimentar os 11 dropdowns.
   const filterDimensions: FilterDimension[] = [
-    { param: "mes", labelAll: "Todos os meses", options: mesesDisponiveis, format: fmtMes },
-    { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: fmtMes },
+    { param: "transportadora", labelAll: "Todas as transportadoras", options: opcoesTransportadoras },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
     { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
-    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: ESC_OPTIONS, format: (v) => ESC_LABELS[v] ?? v },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: (v) => ESC_LABELS[v] ?? v },
     {
       param: "prazo",
       labelAll: "Todos os prazos",
@@ -668,9 +680,9 @@ export default async function FinanceiroPage({
       format: (v) => `${v} dia${v === "1" ? "" : "s"}`,
     },
     { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
-    { param: "janela", labelAll: "Todas as janelas", options: JANELA_OPTIONS },
-    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: FAIXA_PESO_OPTIONS },
-    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: FAIXA_CUBAGEM_OPTIONS },
+    { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelas },
+    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: opcoesFaixasPeso },
+    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: opcoesFaixasCubagem },
   ];
 
   const pctBarata = k && k.escS + k.escN > 0 ? k.escS / (k.escS + k.escN) : null;

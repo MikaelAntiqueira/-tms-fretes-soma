@@ -28,21 +28,25 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 // componente, confirmando a promessa original de que virar mais uma
 // <FilterDimension> bastava.
 //
-// CASCATA DE OPÇÕES — NÃO IMPLEMENTADA NESTA ETAPA. No Artifact original,
-// cada dropdown só mostra valores que ainda produzem >=1 resultado dado o
-// estado de TODOS OS OUTROS filtros ativos (`populateSelect()` chamado de
-// novo a cada mudança, com a lista podada por `rowMatchesFilters(i, def.key)`
-// — ver HTML de referência, linhas ~1305-1345). Aqui, a lista de opções de
-// cada dropdown é SEMPRE A LISTA COMPLETA de valores possíveis na base
-// inteira, buscada 1x no carregamento da página (nunca recalculada a cada
-// clique) — ver `getFinanceiroData()` em page.tsx. Consequência visível:
-// marcar "Mês = 2026-05" não reduz as opções do dropdown "Transportadora"
-// mesmo que alguma transportadora não tenha operado naquele mês (ela
-// aparece na lista, e simplesmente não devolve linhas se selecionada em
-// conjunto). Isso é uma limitação deliberada desta Fase 1, não um bug —
-// implementar a cascata exigiria recalcular as 4 listas de opções a cada
-// mudança de filtro (ida ao banco ou lógica extra no cliente), escopo maior
-// que "infraestrutura + 4 filtros", fica para uma etapa futura.
+// CASCATA DE OPÇÕES — IMPLEMENTADA em 2026-09-14 (RPC
+// `financeiro_filtro_opcoes_cascata`, chamada com o `filtroArgs` completo em
+// `getFinanceiroData()`). Cada dropdown só mostra valores que ainda produzem
+// >=1 resultado dado o estado das OUTRAS 10 dimensões ativas — porta
+// `rowMatchesFilters(i, exclude)`/`updateAllFilterOptions()` do Artifact
+// original (HTML de referência, linhas ~1305-1345) pra SQL: 11 subqueries,
+// uma por dimensão, cada uma reaplicando os filtros das outras 10. Como a
+// página inteira já é Server Component re-renderizado a cada mudança de URL
+// (nenhum estado client-side), a cascata sai "de graça" nesse mesmo
+// round-trip — não precisou de nenhum fetch extra no cliente.
+//
+// Pegadinha de performance encontrada e corrigida: a primeira versão da RPC
+// chamava `v_cotacao_filtros` (que já custa ~240ms por causa do join com
+// `v_financeiro_base`) uma vez POR DIMENSÃO — 11×240ms ~2,6s, deu timeout.
+// Fix: `with base as materialized (select * from v_cotacao_filtros)` no
+// topo da function, agregando as 11 listas em cima dessa única
+// materialização. Lição para quem estender esta RPC: nunca referenciar a
+// view diretamente dentro de múltiplos subqueries independentes — sempre
+// via uma CTE materializada.
 //
 // SÓ A SUB-ABA "VISÃO GERAL" DE /financeiro REAGE A ESTES FILTROS por
 // enquanto (KPIs executivos, Meio-dia × Tarde, Resumo executivo). As

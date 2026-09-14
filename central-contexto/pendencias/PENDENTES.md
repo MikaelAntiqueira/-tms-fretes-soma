@@ -15,14 +15,16 @@
       **Pendente**: confirmação de `tsc`/`build` limpo (rodar na máquina do Hermes — a principal
       ficou sem RAM pro `npm install`).
 
+- [x] Implementar cascata de opções — RPC `financeiro_filtro_opcoes_cascata`, commit da sessão
+      principal 2026-09-14. Sai "de graça" no mesmo round-trip (página já é Server Component
+      re-renderizado a cada mudança de URL). Ver comentário no topo de `FilterBar.tsx` pra
+      pegadinha de performance (materializar a view numa CTE, não referenciar direto em 11
+      subqueries — deu timeout na primeira versão).
+
 ### A fazer agora
-- [ ] Implementar cascata de opções (dropdown filtrado por outros filtros ativos)
 - [ ] Fazer outras páginas reagirem ao filtro (além de /financeiro Visão Geral)
 - [ ] Validar as 11 dimensões campo a campo contra o Artifact original (só as 4 da Fase 1 foram
       validadas por Playwright até agora)
-
-### Dependências
-- Client-side cascade logic (ou extensão das RPCs existentes)
 
 ## Dashboard completo (fase futura)
 
@@ -97,7 +99,6 @@
 
 ## Melhorias de qualidade
 
-- [ ] Melhorar performance do Filtro Global com cascata
 - [ ] Revisar uso do createSupabaseServerClient em páginas que poderiam usar
 - [ ] Documentar RPCs criados (já parcialmente feito nos comments dos arquivos)
 
