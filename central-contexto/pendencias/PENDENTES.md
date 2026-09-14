@@ -47,7 +47,7 @@
 > | chartClassif | `components/ClassificacaoChart.tsx` — **portado nesta sessão (Hermes, 2026-09-14)**, ver `oportunidades/OportunidadesTabsClient.tsx` |
 
 - [x] chartClassif ("Classificação por impacto", doughnut) — portado em `src/components/ClassificacaoChart.tsx`
-- [ ] `ontTendChart` — tendência 15 dias, página `/ontem` (Hoje) — **o único gráfico que realmente falta**, `ontem/page.tsx` não tem nenhum gráfico ainda
+- [x] `ontTendChart` ("Diferença dos últimos 15 dias", barra) — portado em `src/components/OntemTendenciaChart.tsx` + RPC `ontem_tendencia_15_dias` (migration `fn_ontem_tendencia_15_dias`). Os 16/16 gráficos do Artifact original agora têm equivalente no Next.js.
 - [ ] Validar campo a campo cada gráfico portado com sistema de referência
 
 ### Tabelas restantes — inventário corrigido em 2026-09-14
