@@ -44,3 +44,4 @@ next-env.d.ts
 # lockfile não versionado nesta fase inicial de propósito (arquivo grande,
 # regenerado por `npm install`; package.json já fixa as faixas de versão)
 package-lock.json
+npm-install.log

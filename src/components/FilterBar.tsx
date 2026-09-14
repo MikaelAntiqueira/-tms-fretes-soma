@@ -4,30 +4,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 // ============================================================================
-// FilterBar — motor de filtro global, [TASK-29] FASE 1 (infraestrutura + os
-// 4 filtros mais usados). Ver também o comentário no topo de
-// src/app/financeiro/page.tsx sobre como esta página consome o componente.
+// FilterBar — motor de filtro global, [TASK-29]. Ver também o comentário no
+// topo de src/app/financeiro/page.tsx sobre como esta página consome o
+// componente.
 //
 // ---------------------------------------------------------------------------
-// O QUE EXISTE AGORA (Fase 1)
+// O QUE EXISTE AGORA
 // ---------------------------------------------------------------------------
 // No Artifact original ("Fretes Cotado x Contratado", c0abf79e-..., v42) há
 // 11 dropdowns multi-seleção no topo (`MSEL_KEYS`, linha ~1216 do HTML de
 // referência): mes, tContr, romaneio, uf, tipo, esc, prazo, cidade, janela,
-// faixaPeso, faixaCubagem. Esta Fase 1 porta a INFRAESTRUTURA do motor
-// (componente genérico + convenção de URL + convenção de SQL) e só 4 das 11
-// dimensões — as citadas nos comentários de /transportadoras e /financeiro
-// como "as que fazem sentido para dados agregados por transportadora":
-//   1. Mês                       (?mes=2026-07,2026-08)
-//   2. Transportadora Contratada (?transportadora=Fritz+Express,LKW)
-//   3. Região Comercial          (?regiao=SUL,LITORAL)
-//   4. Tipo Cliente               (?tipo=Privado,Publico)
-//
-// AS OUTRAS 7 DIMENSÕES AINDA FALTAM (etapas futuras, NÃO é bug/esquecimento
-// desta rodada): romaneio, esc (escolheu a mais barata), prazo, cidade,
-// janela, faixaPeso, faixaCubagem. Quando forem portadas, cada uma vira mais
-// uma <FilterDimension> na lista passada para <FilterBar>, seguindo o mesmo
-// padrão — nenhuma mudança estrutural neste componente deve ser necessária.
+// faixaPeso, faixaCubagem. A Fase 1 (2026-09-12) portou a INFRAESTRUTURA do
+// motor (componente genérico + convenção de URL + convenção de SQL) e só 4
+// das 11 dimensões (Mês, Transportadora Contratada, Região Comercial, Tipo
+// Cliente). Em 2026-09-14 (migration `fn_filtro_global_fase1_7_dimensoes_
+// restantes`) as 7 dimensões restantes foram completadas — romaneio, esc
+// (escolheu a mais barata), prazo, cidade, janela, faixaPeso, faixaCubagem —
+// reaproveitando exatamente as mesmas colunas/faixas já usadas em outras
+// partes do sistema (v_financeiro_padroes_base, os bins de financeiro_peso_
+// frete, o CASE de janela de transportadoras_comparativo). As 11 dimensões
+// já estão na lista passada para <FilterBar> em src/app/financeiro/page.tsx
+// (sub-aba Visão Geral) — nenhuma mudança estrutural foi necessária neste
+// componente, confirmando a promessa original de que virar mais uma
+// <FilterDimension> bastava.
 //
 // CASCATA DE OPÇÕES — NÃO IMPLEMENTADA NESTA ETAPA. No Artifact original,
 // cada dropdown só mostra valores que ainda produzem >=1 resultado dado o

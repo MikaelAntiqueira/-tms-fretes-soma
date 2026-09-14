@@ -274,17 +274,46 @@ interface FinanceiroData {
   custoM3Geral: number | null;
   opcoesRegioes: string[];
   opcoesTipos: string[];
+  opcoesCidades: string[];
+  opcoesRomaneios: string[];
+  opcoesPrazos: number[];
 }
 
-// Filtros da Fase 1 do motor de filtro global (só os 4 já suportados —
-// ver comentário no topo do arquivo). `null` numa dimensão = sem filtro
-// nela (mesma convenção das functions SQL, default null = "todos").
+// Filtros do motor de filtro global — as 4 da Fase 1 + as 7 que faltavam
+// (migration fn_filtro_global_fase1_7_dimensoes_restantes, 2026-09-14).
+// `null` numa dimensão = sem filtro nela (mesma convenção das functions
+// SQL, default null = "todos"). `prazos` fica number[] (não string[]) porque
+// a coluna/param SQL são int[] — as demais dimensões continuam text[].
 interface FiltrosVisaoGeral {
   meses: string[] | null;
   transportadoras: string[] | null;
   regioes: string[] | null;
   tipos: string[] | null;
+  romaneios: string[] | null;
+  esc: string[] | null;
+  prazos: number[] | null;
+  cidades: string[] | null;
+  janelas: string[] | null;
+  faixasPeso: string[] | null;
+  faixasCubagem: string[] | null;
 }
+
+// Conjuntos fixos e pequenos (mesmo padrão de TRANSP_ORDER/JANELAS_FIXAS):
+// não precisam de ida ao banco, os rótulos vêm direto do CASE da migration.
+const ESC_OPTIONS = ["S", "N", "SC"];
+const ESC_LABELS: Record<string, string> = { S: "Sim", N: "Não", SC: "Sem comparação" };
+const JANELA_OPTIONS = ["Meio-dia", "Tarde"];
+const FAIXA_PESO_OPTIONS = [
+  "0–10kg",
+  "10–25kg",
+  "25–50kg",
+  "50–100kg",
+  "100–250kg",
+  "250–500kg",
+  "500–1.000kg",
+  "1.000kg+",
+];
+const FAIXA_CUBAGEM_OPTIONS = ["<0,05 m³", "0,05–0,15 m³", "0,15–0,5 m³", "0,5–2 m³", "2+ m³", "Não informado"];
 
 // Lista fixa das 7 transportadoras, MESMA ordem usada em `transportadoras_
 // comparativo()` (cláusula `VALUES` da function) e no `TRANSP_ORDER` do
@@ -301,6 +330,13 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     p_transportadoras: filtros.transportadoras,
     p_regioes: filtros.regioes,
     p_tipos: filtros.tipos,
+    p_romaneios: filtros.romaneios,
+    p_esc: filtros.esc,
+    p_prazos: filtros.prazos,
+    p_cidades: filtros.cidades,
+    p_janelas: filtros.janelas,
+    p_faixas_peso: filtros.faixasPeso,
+    p_faixas_cubagem: filtros.faixasCubagem,
   };
 
   const [
@@ -413,6 +449,11 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
   const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
   const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
+  const opcoesCidades: string[] = (opcoesRow?.cidades as string[] | null) ?? [];
+  const opcoesRomaneios: string[] = (opcoesRow?.romaneios as string[] | null) ?? [];
+  // `prazos` volta como text[] da RPC (ver comentário da migration) — converte pra
+  // number[] aqui, único lugar que precisa saber que prazo é numérico.
+  const opcoesPrazos: number[] = ((opcoesRow?.prazos as string[] | null) ?? []).map(Number);
 
   const evolucaoRows = (evolucaoRes.data as Record<string, unknown>[]) ?? [];
   const evolucaoMensal: EvolucaoMesRow[] = evolucaoRows.map((r) => ({
@@ -507,6 +548,9 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     custoM3Geral,
     opcoesRegioes,
     opcoesTipos,
+    opcoesCidades,
+    opcoesRomaneios,
+    opcoesPrazos,
   };
 }
 
@@ -556,11 +600,19 @@ export default async function FinanceiroPage({
   searchParams: Promise<FinanceiroSearchParams>;
 }) {
   const sp = await searchParams;
+  const prazosParam = parseMulti(sp.prazo);
   const filtros: FiltrosVisaoGeral = {
     meses: parseMulti(sp.mes),
     transportadoras: parseMulti(sp.transportadora),
     regioes: parseMulti(sp.regiao),
     tipos: parseMulti(sp.tipo),
+    romaneios: parseMulti(sp.romaneio),
+    esc: parseMulti(sp.esc),
+    prazos: prazosParam ? prazosParam.map(Number) : null,
+    cidades: parseMulti(sp.cidade),
+    janelas: parseMulti(sp.janela),
+    faixasPeso: parseMulti(sp.faixaPeso),
+    faixasCubagem: parseMulti(sp.faixaCubagem),
   };
 
   let data: FinanceiroData | null = null;
@@ -592,6 +644,9 @@ export default async function FinanceiroPage({
   const custoM3Geral = data?.custoM3Geral ?? null;
   const opcoesRegioes = data?.opcoesRegioes ?? [];
   const opcoesTipos = data?.opcoesTipos ?? [];
+  const opcoesCidades = data?.opcoesCidades ?? [];
+  const opcoesRomaneios = data?.opcoesRomaneios ?? [];
+  const opcoesPrazos = data?.opcoesPrazos ?? [];
 
   // Opções do dropdown "Mês": todos os meses presentes na base (mesma lista
   // que `financeiro_evolucao_mensal()` já devolve, sem filtro nenhum — não
@@ -604,6 +659,18 @@ export default async function FinanceiroPage({
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+    { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: ESC_OPTIONS, format: (v) => ESC_LABELS[v] ?? v },
+    {
+      param: "prazo",
+      labelAll: "Todos os prazos",
+      options: opcoesPrazos.map(String),
+      format: (v) => `${v} dia${v === "1" ? "" : "s"}`,
+    },
+    { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
+    { param: "janela", labelAll: "Todas as janelas", options: JANELA_OPTIONS },
+    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: FAIXA_PESO_OPTIONS },
+    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: FAIXA_CUBAGEM_OPTIONS },
   ];
 
   const pctBarata = k && k.escS + k.escN > 0 ? k.escS / (k.escS + k.escN) : null;
@@ -710,8 +777,9 @@ export default async function FinanceiroPage({
             <h1>Financeiro</h1>
             <p>
               KPIs executivos, evolução mensal e decisões de contratação. A sub-aba <b>Visão Geral</b>{" "}
-              já aceita os filtros de Mês, Transportadora Contratada, Região Comercial e Tipo Cliente
-              (Fase 1 do motor de filtro global); as demais 3 sub-abas ainda mostram sempre a base
+              já aceita as 11 dimensões do motor de filtro global (Mês, Transportadora Contratada,
+              Região Comercial, Tipo Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela,
+              Faixa de Peso, Faixa de Cubagem); as demais 3 sub-abas ainda mostram sempre a base
               completa, sem filtro.
             </p>
             <nav className="crumbs">
@@ -904,13 +972,6 @@ export default async function FinanceiroPage({
                         <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
                           fora de propósito nesta etapa — regra &quot;nunca estima, sempre real, operação a
                           operação&quot; merece validação própria, com mais tempo
-                        </span>
-                      </li>
-                      <li>
-                        <span className="name">Motor de filtro — 7 dimensões restantes</span>
-                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
-                          romaneio, escolheu a mais barata, prazo, cidade, janela, faixa de peso, faixa de
-                          cubagem — Fase 1 trouxe só Mês/Transportadora/Região/Tipo (ver FilterBar.tsx)
                         </span>
                       </li>
                       <li>
