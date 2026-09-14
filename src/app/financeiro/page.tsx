@@ -252,6 +252,20 @@ interface CubagemCustoRow {
   custoM3: number | null;
 }
 
+// Simulação de Custo por Transportadora — 4º bloco da Visão Geral original,
+// portado em 2026-09-14 (RPC financeiro_simulacao_custo, migration
+// fn_financeiro_simulacao_custo). Só faz sentido com exatamente 1
+// transportadora no filtro (ver condição de render mais abaixo) — regra
+// "nunca estima, sempre real": custoAlternativo soma só ofertas reais da
+// alternativa nas MESMAS linhas do filtro; coberturaN/processosFiltrados
+// é sempre mostrado explícito (nunca esconde que a comparação é parcial).
+interface SimulacaoCustoRow {
+  alternativa: string;
+  custoAlternativo: number | null;
+  coberturaN: number;
+  diferenca: number | null;
+}
+
 interface FinanceiroData {
   kpis: FinanceiroKpis | null;
   resumo: FinanceiroResumo | null;
@@ -272,6 +286,9 @@ interface FinanceiroData {
   cubagemCusto: CubagemCustoRow[];
   custoKgGeral: number | null;
   custoM3Geral: number | null;
+  simulacaoCusto: SimulacaoCustoRow[];
+  processosFiltrados: number;
+  custoRealSimulado: number | null;
   opcoesMeses: string[];
   opcoesTransportadoras: string[];
   opcoesRegioes: string[];
@@ -341,6 +358,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     outliersRes,
     prazoFreteRes,
     cubagemRes,
+    simulacaoRes,
   ] = await Promise.all([
     // ---- as 4 RPCs que a sub-aba "Visão Geral" usa: reagem ao filtro ----
     supabase.rpc("financeiro_visao_geral_kpis", filtroArgs),
@@ -365,6 +383,10 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     supabase.rpc("financeiro_outliers_peso"),
     supabase.rpc("financeiro_prazo_frete_medio"),
     supabase.rpc("financeiro_cubagem_custo"),
+    // ---- Simulação de Custo por Transportadora (4º bloco Visão Geral) —
+    // reage ao filtro; a própria function só devolve linhas com exatamente
+    // 1 transportadora filtrada (ver migration fn_financeiro_simulacao_custo).
+    supabase.rpc("financeiro_simulacao_custo", filtroArgs),
   ]);
   for (const res of [
     kpisRes,
@@ -382,6 +404,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     outliersRes,
     prazoFreteRes,
     cubagemRes,
+    simulacaoRes,
   ]) {
     if (res.error) throw new Error(res.error.message);
   }
@@ -523,6 +546,16 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   const custoKgGeral = cubagemRows[0]?.custo_kg_geral == null ? null : Number(cubagemRows[0].custo_kg_geral);
   const custoM3Geral = cubagemRows[0]?.custo_m3_geral == null ? null : Number(cubagemRows[0].custo_m3_geral);
 
+  const simulacaoRows = (simulacaoRes.data as Record<string, unknown>[]) ?? [];
+  const simulacaoCusto: SimulacaoCustoRow[] = simulacaoRows.map((r) => ({
+    alternativa: String(r.alternativa),
+    custoAlternativo: r.custo_alternativo == null ? null : Number(r.custo_alternativo),
+    coberturaN: Number(r.cobertura_n ?? 0),
+    diferenca: r.diferenca == null ? null : Number(r.diferenca),
+  }));
+  const processosFiltrados = Number(simulacaoRows[0]?.processos_filtrados ?? 0);
+  const custoRealSimulado = simulacaoRows[0]?.custo_real == null ? null : Number(simulacaoRows[0].custo_real);
+
   return {
     kpis,
     resumo,
@@ -541,6 +574,9 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     outliersPeso,
     prazoFrete,
     cubagemCusto,
+    simulacaoCusto,
+    processosFiltrados,
+    custoRealSimulado,
     custoKgGeral,
     custoM3Geral,
     opcoesMeses,
@@ -557,7 +593,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   };
 }
 
-import { fmtMes, parseMulti, fmtBRL, fmtBRL2, fmtNum, fmtPct } from "@/lib/format";
+import { fmtMes, parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct } from "@/lib/format";
 
 type FinanceiroSearchParams = Record<string, string | string[] | undefined>;
 
@@ -607,6 +643,9 @@ export default async function FinanceiroPage({
   const outliersPeso = data?.outliersPeso ?? [];
   const prazoFrete = data?.prazoFrete ?? [];
   const cubagemCusto = data?.cubagemCusto ?? [];
+  const simulacaoCusto = data?.simulacaoCusto ?? [];
+  const processosFiltrados = data?.processosFiltrados ?? 0;
+  const custoRealSimulado = data?.custoRealSimulado ?? null;
   const custoKgGeral = data?.custoKgGeral ?? null;
   const custoM3Geral = data?.custoM3Geral ?? null;
   const opcoesMeses = data?.opcoesMeses ?? [];
@@ -937,10 +976,60 @@ export default async function FinanceiroPage({
                 </div>
               </section>
 
+              {filtros.transportadoras?.length === 1 && (
+                <section className="bloc">
+                  <div className="bloc-head">
+                    <h2>Simulação de Custo por Transportadora</h2>
+                    <div className="sub">
+                      Se todo o volume filtrado de <b>{filtros.transportadoras[0]}</b> tivesse sido contratado com
+                      cada alternativa — só com cotações reais, nunca estimadas
+                    </div>
+                  </div>
+                  <div className="cov-note" style={{ marginBottom: 10 }}>
+                    <b>FATO:</b> custo real de {filtros.transportadoras[0]} no recorte filtrado ({fmtNum(processosFiltrados)}{" "}
+                    processos): <b>{fmtBRL(custoRealSimulado)}</b>. Para cada alternativa abaixo, o valor soma só as
+                    ofertas em que ela realmente cotou nas mesmas linhas — a cobertura mostra quantas das{" "}
+                    {fmtNum(processosFiltrados)} são comparáveis; sem oferta real, a linha não entra na soma (nunca
+                    estimada).
+                  </div>
+                  {simulacaoCusto.length === 0 ? (
+                    <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Nenhuma transportadora ativa para comparar.</p>
+                  ) : (
+                    <table className="data" style={{ fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th>Alternativa</th>
+                          <th className="num">Cobertura</th>
+                          <th className="num">Custo simulado (R$)</th>
+                          <th className="num">Diferença vs. real (R$)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {simulacaoCusto.map((s) => (
+                          <tr key={s.alternativa}>
+                            <td>{s.alternativa}</td>
+                            <td className="num">
+                              {fmtNum(s.coberturaN)} / {fmtNum(processosFiltrados)}
+                            </td>
+                            <td className="num">{s.custoAlternativo == null ? "— sem cotação" : fmtBRL(s.custoAlternativo)}</td>
+                            <td
+                              className="num"
+                              style={{ color: s.diferenca == null ? undefined : s.diferenca < 0 ? "var(--good)" : "var(--critical)" }}
+                            >
+                              {s.diferenca == null ? "—" : fmtBRLSigned(s.diferenca)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              )}
+
               <section className="bloc">
                 <div className="card">
                   <h3>Pendências desta etapa</h3>
-                  <div className="sub">4º bloco da Visão Geral original + próximas etapas do motor de filtro</div>
+                  <div className="sub">próximas etapas do motor de filtro</div>
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
                       <li>
