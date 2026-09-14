@@ -118,28 +118,25 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
 - [ ] Simulação de Custo por Transportadora (4º bloco da Visão Geral) — regra "nunca estima, sempre real"
 - [ ] Área administrativa de importação de arquivos (usar policy nova de importacoes)
 
-## Auth e segurança — CORRIGIDO 2026-09-14 (doc estava desatualizada)
+## Auth e segurança — RESOLVIDO 2026-09-14 (doc estava desatualizada, corrigida agora)
 
-> Auditoria (task #3, sessão principal): conferi as policies reais no banco (`pg_policies`),
-> não só o que os docs diziam. **As 5 tabelas de dado (`clientes`, `cotacoes`, `ofertas`,
-> `contratacoes`, `transportadoras`) já estão com SELECT restrito a `authenticated`** —
-> migration `restringir_leitura_a_usuarios_autenticados` (2026-09-12). Isso contradiz D-10/D-13
-> abaixo e o estado descrito antes aqui ("policies públicas mantidas") — os docs nunca foram
-> atualizados depois dessa migration.
+> Auditoria (task #3, sessão principal): as 5 tabelas de dado (`clientes`, `cotacoes`, `ofertas`,
+> `contratacoes`, `transportadoras`) estão com SELECT restrito a `authenticated` desde
+> `restringir_leitura_a_usuarios_autenticados` (2026-09-12).
 
-- [x] ~~Remover policies de leitura pública temporárias~~ — JÁ FEITO em 2026-09-12, antes até
-      da Central de Contexto existir (por isso o doc nunca refletiu)
-- [ ] **Decisão do Mikael necessária**: isso foi intencional ou foi uma trava excessiva de uma
-      sessão anterior? PRINCIPIOS.md diz explicitamente "policy de leitura pública temporária
-      apenas durante a fase de desenvolvimento aberto" — se ainda estamos nessa fase, a leitura
-      deveria ter voltado a ser pública, não o contrário.
-- [ ] **Se a resposta for "manter autenticado"**: implementar middleware de redirecionamento
-      para /login É URGENTE, não "fase futura" — sem ele, qualquer visitante deslogado hoje só
-      vê páginas com todos os KPIs/gráficos vazios (RLS devolve 0 linhas pro role `anon`, sem
-      nenhum aviso), não um login. Isso pode já estar acontecendo em produção agora.
-- [ ] **Se a resposta for "reverter pra pública"**: recriar as policies antigas (`for select
-      using (true)` pro role anon, mesmo padrão de antes de 2026-09-12).
-- [ ] Proteger páginas administrativas (independente da resposta acima)
+- [x] ~~Remover policies de leitura pública temporárias~~ — feito em 2026-09-12
+- [x] **Decisão do Mikael tomada** (2026-09-14, registrada em agent_tasks#10): manter acesso
+      `authenticated`-only (não reverter pra pública) + criar middleware de redirecionamento.
+- [x] **Middleware de redirecionamento para `/login` implementado** — `middleware.ts` na raiz
+      do repo (commits `6192324`, `e94d1ac`, `c280bae`, `9884768`), usa `@supabase/ssr` +
+      `getUser()` pra revalidar o token a cada requisição. `/login` ajustado com `?redirect=`
+      de volta pra página original. Testado em produção: `/financeiro` sem sessão redireciona
+      corretamente pra `/login?redirect=/financeiro`.
+- [x] `v_cotacao_filtros` — achado à parte (não relacionado ao middleware): faltava
+      `security_invoker=true`, bypassando RLS nesse endpoint específico mesmo com o resto
+      correto. Corrigido 2026-09-14, ver [D-23] em LOG_DECISOES.md.
+- [ ] Proteger páginas administrativas — ainda não se aplica: a área administrativa de
+      importação de arquivos (abaixo, em "Funcionalidades") não existe como rota ainda.
 
 ## Melhorias de qualidade
 
