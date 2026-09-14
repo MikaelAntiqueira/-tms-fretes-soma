@@ -189,3 +189,30 @@ lá por permissão de ferramenta — troca `percentile_cont` (interpolação) po
 **Motivo**: na faixa "1.000kg+" a diferença chegava a ~20% no Q1, podendo incluir/excluir
 processos da lista de outliers de forma diferente do original. Detalhe completo em
 `VALIDACAO_23_ITENS.md`.
+
+## D-25 — Confirmações trazidas do Google Drive (docs-fonte lidos integralmente, 2026-09-14)
+
+Trazido `mapa-migracao-tms-v3-2026-09-11.md` e `06_LOG_DECISOES.md` (projeto original) pra dentro
+da investigação de hoje, pra resolver dúvidas que este repo não conseguia responder sozinho:
+
+1. **A classificação `classif`/`riscoPrazoAlt` que `comparacoes` usa está correta** — `[DEC-22]`
+   (emenda 2026-09-10, FINAL) confirma: São Miguel×Leomar **não é excluído** da economia (a
+   Diferença pós-recorte inclui os R$ 45.938,44 completos), só recebe o selo `riscoPrazoAlt`
+   ("economia possível, mas exige aceitar risco de prazo da Leomar"). É exatamente o que a
+   migration de `comparacoes` já fazia (preservada, não reinventada) — a ressalva do agent_tasks#7
+   ("TASK-28 item E5 sem decisão FINAL, não fixar regra nova") não se aplica: não inventei regra
+   nova, só portei a já escrita.
+2. **A arquitetura "function SQL por página" (em vez de carregar tudo e filtrar em JS) é decisão
+   técnica deliberada** — `[DEC-31]`, 2026-09-11, status "NÃO FINAL mas dentro da autonomia
+   delegada" — diverge de propósito da recomendação original do mapa de migração (que sugeria
+   preservar o filtro 100% client-side). Confirma que portar o filtro global pras demais
+   páginas (item aberto em PENDENTES.md) é dar cada function novos parâmetros opcionais, não
+   reescrever a arquitetura.
+3. **Pitfall documentado que se repetiu**: `06_LOG_DECISOES.md` (nota técnica 2026-09-12) já
+   registrava `v_cotacao_filtros` sem `security_invoker=true` como achado corrigido naquele dia
+   (`fix_v_cotacao_filtros_e_importacoes_policy_perf`) — mas voltou a quebrar depois (achado de
+   novo hoje, [D-23]), quase certamente porque uma migration posterior (`fn_filtro_global_fase1_
+   7_dimensoes_restantes`, que estendeu a mesma view com `CREATE OR REPLACE VIEW`) não repetiu a
+   cláusula `WITH`. **Lição pra qualquer migration futura que faça `CREATE OR REPLACE VIEW` em
+   `v_cotacao_filtros` (ou qualquer view já com `security_invoker=true`): sempre repetir a
+   cláusula `WITH (security_invoker = true)`, nunca assumir que persiste.**
