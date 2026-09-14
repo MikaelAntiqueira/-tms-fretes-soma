@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 
 // Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
 // contratação cruzada a uma cotação. Porta, linha a linha, a lógica de
@@ -136,6 +137,7 @@ interface OntemData {
   linhas: OntemLinha[];
   cobertura: OntemCobertura | null;
   radar: RadarCardData[];
+  tendencia: OntemTendenciaRow[];
 }
 
 function toDrillRows(arr: unknown): DrillRow[] {
@@ -380,16 +382,17 @@ async function getOntemData(): Promise<OntemData> {
   const ref = (refRes.data as string | null) ?? null;
 
   if (!ref) {
-    return { ref: null, kpis: null, linhas: [], cobertura: null, radar: [] };
+    return { ref: null, kpis: null, linhas: [], cobertura: null, radar: [], tendencia: [] };
   }
 
-  const [kpisRes, linhasRes, coberturaRes, radar] = await Promise.all([
+  const [kpisRes, linhasRes, coberturaRes, tendenciaRes, radar] = await Promise.all([
     supabase.rpc("ontem_kpis", { p_dia: ref }),
     supabase.rpc("ontem_contratacoes", { p_dia: ref }),
     supabase.rpc("ontem_cobertura", { p_dia: ref }),
+    supabase.rpc("ontem_tendencia_15_dias"),
     getRadarData(ref),
   ]);
-  for (const res of [kpisRes, linhasRes, coberturaRes]) {
+  for (const res of [kpisRes, linhasRes, coberturaRes, tendenciaRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -436,7 +439,12 @@ async function getOntemData(): Promise<OntemData> {
       }
     : null;
 
-  return { ref, kpis, linhas, cobertura, radar };
+  const tendencia: OntemTendenciaRow[] = ((tendenciaRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    dia: r.dia as string,
+    soma_diff_pos: Number(r.soma_diff_pos ?? 0),
+  }));
+
+  return { ref, kpis, linhas, cobertura, radar, tendencia };
 }
 
 // ---- formatação — reproduz fmtBRL/fmtPct/fmtNum/fmtDate do Artifact original
@@ -631,6 +639,7 @@ export default async function OntemPage() {
 
   const comCmp = kpis?.n_comparaveis ?? 0;
   const totalDia = kpis?.n_contratacoes ?? 0;
+  const tendencia = data?.tendencia ?? [];
 
   return (
     <div className="app-shell">
@@ -707,25 +716,28 @@ export default async function OntemPage() {
             </section>
 
             <section className="bloc">
-              <div className="card">
-                <h3>Aguardando dado / regra</h3>
-                <div className="sub">detectores que ligam quando a informação chegar da gestão / do TMS</div>
-                <div className="alert-card info" style={{ marginTop: 8 }}>
-                  <ul>
-                    <li>
-                      <span className="name">Oportunidade objetiva (prazo + prestação iguais)</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>
-                        aguarda prazo e prestação por oferta (TMS/API)
-                      </span>
-                    </li>
-                    <li>
-                      <span className="name">Frete mínimo fora do parâmetro</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>
-                        aguarda os valores por transportadora (gestão)
-                      </span>
-                    </li>
-                  </ul>
+              <div className="grid cols2">
+                <div className="card">
+                  <h3>Aguardando dado / regra</h3>
+                  <div className="sub">detectores que ligam quando a informação chegar da gestão / do TMS</div>
+                  <div className="alert-card info" style={{ marginTop: 8 }}>
+                    <ul>
+                      <li>
+                        <span className="name">Oportunidade objetiva (prazo + prestação iguais)</span>
+                        <span className="num" style={{ color: "var(--text-muted)" }}>
+                          aguarda prazo e prestação por oferta (TMS/API)
+                        </span>
+                      </li>
+                      <li>
+                        <span className="name">Frete mínimo fora do parâmetro</span>
+                        <span className="num" style={{ color: "var(--text-muted)" }}>
+                          aguarda os valores por transportadora (gestão)
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
+                <OntemTendenciaChart rows={tendencia} diaRef={ref} />
               </div>
             </section>
 
