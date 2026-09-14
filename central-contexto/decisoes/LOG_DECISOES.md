@@ -1,6 +1,6 @@
 # Decisões — TMS Fretes SOMA
 
-> Registro de decisões importantes com motivo. Última atualização: 2026-09-13.
+> Registro de decisões importantes com motivo. Última atualização: 2026-09-14.
 > Fonte: README.md do repo + sessões do outro PC + claude.json
 
 ## D-01 — Migração incremental, não reescrita
@@ -216,3 +216,50 @@ da investigação de hoje, pra resolver dúvidas que este repo não conseguia re
    cláusula `WITH`. **Lição pra qualquer migration futura que faça `CREATE OR REPLACE VIEW` em
    `v_cotacao_filtros` (ou qualquer view já com `security_invoker=true`): sempre repetir a
    cláusula `WITH (security_invoker = true)`, nunca assumir que persiste.**
+
+## D-26 — Causa raiz real do 500 em /operacao: 5 recomputos concorrentes de v_operacao_base, não (só) o middleware duplicado
+
+**Decisão**: uma sessão anterior (mesmo dia, 2026-09-14) tinha corrigido a duplicação
+`middleware.ts`/`proxy.ts` como hipótese para o 500 relatado pelo Mikael em `/operacao` e
+`/oportunidades`, marcando-a como "correção plausível, não confirmada". Investigando de novo
+(pedido do Mikael "quero corrigir os erros de acessar as páginas"), encontrei a causa raiz REAL
+de `/operacao`, com prova em log (não hipótese): `postgrest_logs` + `postgres_logs` mostram 5
+chamadas `POST /rpc/operacao_por_janela` retornando 500 em 2026-09-14T12:10, todas com
+"canceling statement due to statement timeout". O motivo: `/operacao/page.tsx` disparava, num
+único `Promise.all`, 7 RPCs — 5 delas (`operacao_kpis`, `operacao_por_transportadora`,
+`operacao_por_janela_transportadora`, `operacao_por_cidade`, `operacao_por_janela`)
+recomputavam de forma independente e CONCORRENTE a mesma view cara `v_operacao_base` (~900ms
+sozinha, warm cache, medido via `EXPLAIN ANALYZE`). 5 execuções simultâneas da mesma consulta
+pesada, sob cache frio ou qualquer contenção, empurram o tempo real acima do
+`statement_timeout` do role `authenticated` — **8 segundos**, bem menor que os 2 minutos do
+role padrão/postgres (`select rolconfig from pg_roles` confirmou: `anon`=3s, `authenticated`=8s).
+Isso explica por que o erro é intermitente (só aparece sob certas condições de carga/cache) e
+por que a correção do middleware, sozinha, não bastava.
+
+**Correção** (migration `fix_operacao_dashboard_estatico_reduz_recomputo_v_operacao_base` +
+commit `393a6b7` em `src/app/operacao/page.tsx`): nova RPC `operacao_dashboard_estatico()`
+materializa `v_operacao_base` UMA vez e deriva dela as 4 agregações que não dependem do filtro
+global (kpis, por transportadora, por janela×transportadora, por cidade), retornando tudo num
+único `jsonb`. `operacao_por_janela` (a única RPC da página que recebe os 4 parâmetros do
+filtro e por isso não pôde ser combinada — precisa ser chamada de novo a cada mudança de
+filtro) ganhou `materialized` na sua CTE interna como segurança adicional. Resultado: 5
+recomputos concorrentes de `v_operacao_base` por carregamento de página → 2. As 4 functions
+antigas (`operacao_kpis`, `operacao_por_transportadora`, `operacao_por_janela_transportadora`,
+`operacao_por_cidade`) foram mantidas no banco (não removidas, só não são mais chamadas por
+`/operacao`) e usadas para regressão: números idênticos ao novo RPC (494.417,43 / 7
+transportadoras / 42 cidades / 9 linhas janela×transportadora).
+
+**Motivo**: mesma pegadinha já documentada no comentário de `FilterBar.tsx` para
+`financeiro_filtro_opcoes_cascata` ("nunca referenciar a view diretamente em múltiplas
+subqueries independentes — sempre via CTE materializada"), só que aqui o recomputo redundante
+acontecia ENTRE requisições RPC separadas (não dentro de uma só query) — por isso uma CTE
+materializada dentro de cada function isolada não resolveria; era preciso computar a view cara
+uma vez só e reaproveitar entre as 4 agregações que não mudam com o filtro.
+
+**Não verificado**: não há como eu confirmar 100% em produção sem logar como usuário
+autenticado (ação que não posso executar). O que confirmei: (1) prova real do timeout nos logs
+do Supabase; (2) `EXPLAIN ANALYZE` mostrando a redução de carga (a nova RPC materializa a view
+1 vez); (3) regressão de números idêntica às functions antigas. Falta o Mikael confirmar que o
+erro não volta a aparecer em uso normal — se voltar, o próximo passo é olhar se `/oportunidades`
+(que não teve nenhum 500 nos logs das últimas 24h, diferente de `/operacao`) tem um padrão
+parecido de chamadas concorrentes sobre uma view cara.
