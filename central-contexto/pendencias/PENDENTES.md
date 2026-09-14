@@ -35,11 +35,11 @@
 > | chartContrxBarata, chartMaisBarata | `transportadoras/ComparativoCharts.tsx` |
 > | chartUf | `transportadoras/RegiaoComercialChart.tsx` |
 > | chartClientes | `transportadoras/ClientesChart.tsx` |
+> | chartQuadrante | `transportadoras/PrecoPrazoChart.tsx` — **nome do arquivo engana**: o comentário do próprio arquivo diz "Porta `function renderQuadrante(mask)`" (prazo médio histórico × diferença média por transportadora), não é o `chartPrazo` (esse é o de `PesoCustoCharts.tsx`). Corrigido aqui em 2026-09-14 depois de eu (Hermes) ter reportado `chartQuadrante` como faltante por engano numa mensagem anterior — checar sempre o comentário/`renderXxx` portado, não só o nome do componente. |
 > | chartClassif | `components/ClassificacaoChart.tsx` — **portado nesta sessão (Hermes, 2026-09-14)**, ver `oportunidades/OportunidadesTabsClient.tsx` |
 
 - [x] chartClassif ("Classificação por impacto", doughnut) — portado em `src/components/ClassificacaoChart.tsx`
-- [ ] `ontTendChart` — tendência 15 dias, página `/ontem` (Hoje) — **realmente falta**, `ontem/page.tsx` não tem nenhum gráfico ainda
-- [ ] `chartQuadrante` — "Prazo Médio x Diferença Média por Transportadora" (scatter), sub-aba Performance/Comparativo de `/transportadoras` — **realmente falta**
+- [ ] `ontTendChart` — tendência 15 dias, página `/ontem` (Hoje) — **o único gráfico que realmente falta**, `ontem/page.tsx` não tem nenhum gráfico ainda
 - [ ] Validar campo a campo cada gráfico portado com sistema de referência
 
 ### Tabelas restantes — inventário corrigido em 2026-09-14
