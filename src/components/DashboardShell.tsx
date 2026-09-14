@@ -12,8 +12,11 @@
 // Item "Visão Geral" (/) não existe no Artifact (lá a 1ª aba já é "Hoje") —
 // é a página de prova de conceito original desta migração; mantida como
 // 1º item pra não sumir do menu, com um ícone genérico próprio.
-// "Oportunidades" ainda não foi portada (ver 07_PROBLEMAS_ABERTOS.md →
-// [ISSUE-23]) — aparece desabilitada, sem link, com indicação "em breve".
+// "Oportunidades" (2026-09-14): nenhum item de NAV_ITEMS abaixo seta
+// `disabled: true` hoje — a nota antiga aqui ("aparece desabilitada, em
+// breve", referenciando ISSUE-23) ficou desatualizada assim que a página
+// foi portada; o link já é clicável normalmente desde então. `disabled`
+// continua existindo na interface caso um item futuro precise dele.
 //
 // NÃO altera nenhum src/app/*/page.tsx existente — só envolve `children`
 // (vindos de src/app/layout.tsx) numa div com o offset de margem da

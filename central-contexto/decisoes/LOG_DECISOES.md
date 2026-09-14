@@ -139,3 +139,27 @@ peso/cubagem só precisa ser feita em um lugar.
 **Decisão**: Em /financeiro, sub-aba "Padrões da Diferença" → "Diferença por Região", usa `regiao_normalizada` (mesmo campo de RegiaoComercialChart.tsx), nunca a bruta.
 
 **Motivo**: Consistência com [D-02]. O Artifact original faz `BASE.regiaoComercial = BASE.uf.map(normalizarRegiaoComercial)` — mesma transformação.
+
+## D-22 — Bug de duplicação em v_ontem_comparacao corrigido na raiz (não só em `comparacoes`)
+
+**Decisão**: Ao investigar `comparacoes` (correção da página /oportunidades, 2026-09-14),
+encontrei que `v_ontem_comparacao` — usada por /financeiro (indiretamente, via numbers já
+batendo), /ontem e agora `comparacoes` — tinha o mesmo tipo de bug que causou a duplicação em
+`comparacoes`: o CTE `oferta_propria` fazia JOIN direto contra `ofertas` sem agregar por
+(cotacao_id, transportadora_id), e `ofertas` tem registros duplicados de importação (mesmo
+preço/prazo, 2 linhas). Isso duplicava exatamente 2 contratações (de 5.196 pra 5.194 depois da
+correção). Corrigido agregando `oferta_propria` com `MIN(preco_final) GROUP BY
+cotacao_id, transportadora_id` — resto da view idêntico (via `pg_get_viewdef` antes de editar).
+
+**Motivo**: `v_ontem_comparacao` é a fonte de verdade única usada por /ontem inteiro
+(ontem_kpis, ontem_contratacoes, ontem_cobertura, ontem_tendencia_15_dias) e por
+`comparacoes`/`dados_detalhe`. Corrigir só em `comparacoes` teria deixado /ontem com o número
+levemente inflado e uma nova segunda fonte de verdade divergente — exatamente o Risco Nº1 do
+mapa de migração que essa correção inteira tentava evitar. `transportadoras_comparativo` e
+`v_cotacao_filtros`/`v_ontem_radar` já tratavam a duplicata corretamente (usam `distinct on`
+ou agregação) — não precisaram de mudança.
+
+**Validado**: depois da correção, `comparacoes` bate 5.194 linhas / R$ 45.938,44 de diferença
+positiva — exatamente o baseline já documentado em PENDENTES.md ("494.417,43 / 6.915 / 5.194 /
+45.938,44"), que aparentemente já vinha de `v_cotacao_filtros`/`v_ontem_radar` (corretos) — a
+divergência estava só no lado de `v_ontem_comparacao`.

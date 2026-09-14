@@ -33,6 +33,18 @@ fixado em `fn_faixa_peso`/`fn_faixa_cubagem` (lint de segurança do Supabase).
 Build de produção (`next build`) rodou limpo depois da correção — ver item
 "tsc/build limpo" abaixo, também resolvido por tabela.
 
+**Achado adicional na mesma investigação**: o mesmo bug de duplicação existia
+na RAIZ, em `v_ontem_comparacao` (não só na cópia que eu tinha feito em
+`comparacoes`) — afetava também `/ontem` inteiro (ontem_kpis,
+ontem_contratacoes, ontem_cobertura, ontem_tendencia_15_dias) e
+`dados_detalhe`. Corrigido na view em si (migration
+`fix_v_ontem_comparacao_dedup_oferta_propria`) — ver [D-22] em
+LOG_DECISOES.md. Depois da correção, os números batem exatamente com o
+baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
+45.938,44) — confirmado que a divergência estava só do lado de
+`v_ontem_comparacao`, não em `v_cotacao_filtros`/`v_ontem_radar` (usados por
+/financeiro), que já tratavam a duplicata corretamente.
+
 ## Filtro Global — Fase 1 (11/11 dimensões prontas, 2026-09-14)
 
 - [x] Completar as 7 dimensões restantes do Filtro Global:
@@ -131,20 +143,30 @@ Build de produção (`next build`) rodou limpo depois da correção — ver item
 
 ## Melhorias de qualidade
 
-- [ ] Revisar uso do createSupabaseServerClient em páginas que poderiam usar
+- [x] ~~Revisar uso do createSupabaseServerClient em páginas que poderiam usar~~ — **Confirmado
+      2026-09-14**: nenhuma página/componente importa mais `@/lib/supabase` (cliente sem cookie);
+      todas usam `createSupabaseServerClient()`. Conferido também que todas as RPCs de dado são
+      `SECURITY INVOKER` (só `handle_new_user`, o trigger de provisionamento, é `SECURITY DEFINER`
+      — correto, precisa de privilégio elevado pra criar o profile no signup). RLS restrita a
+      `authenticated` está sendo respeitada de ponta a ponta.
 - [ ] Documentar RPCs criados (já parcialmente feito nos comments dos arquivos)
 
 ## Validação
 
-- [ ] Confirmar que R$ 494.417,43 continua batendo após novas alterações
+- [x] Confirmar que R$ 494.417,43 continua batendo após novas alterações — **confirmado 2026-09-14**
+      (R$ 494.417,43 / 5.194 contratações cruzadas, consulta direta em `contratacoes`, sem
+      passar por nenhuma view — inabalado pelas correções desta sessão)
 - [ ] Validar cada nova página/gráfico/tabela campo a campo antes de avançar
 
 ## Issues identificados
 
-### ISSUE-23 — Oportunidades
-- Página "Oportunidades" aparece desabilitada no menu (em breve)
-- Depende de decisão de negócio ainda não tomada
-- Ver mencionado em DashboardShell.tsx e README
+### ISSUE-23 — Oportunidades (RESOLVIDO / doc estava desatualizada, 2026-09-14)
+- A nota "aparece desabilitada no menu (em breve)" estava errada: nenhum item
+  de `NAV_ITEMS` em `DashboardShell.tsx` seta `disabled: true` — o link
+  sempre foi clicável desde que a página foi criada. O que estava
+  genuinamente quebrado era a página em si (view `comparacoes` inexistente,
+  ver seção resolvida acima), não o menu.
+- Comentário desatualizado no topo de `DashboardShell.tsx` corrigido.
 
 ### Doc de referência pendente
 - `docs/mapa-migracao-tms-v3-2026-09-11.md` — documento-mãe da migração no Google Drive (não está neste repo)
