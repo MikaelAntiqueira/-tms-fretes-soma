@@ -76,10 +76,12 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // DECISOES.md`) — e a soma de `financeiro_diff_por_tipo_cliente()` bate
 // com `financeiro_visao_geral_kpis().diff_pos_sum` (R$ 45.938,44).
 //
-// Fora do escopo desta etapa, de propósito (ver bloco "Pendências" no fim
-// da página): a "Simulação de Custo por Transportadora" (4º bloco da
-// Visão Geral original) — regra "nunca estima, sempre real, operação a
-// operação" merece validação própria, com mais tempo.
+// Simulação de Custo por Transportadora (4º bloco da Visão Geral original) —
+// portada em 2026-09-14 (RPC financeiro_simulacao_custo). Só renderiza com
+// exatamente 1 transportadora filtrada; regra "nunca estima, sempre real"
+// preservada (soma só ofertas reais da alternativa nas mesmas linhas do
+// filtro, cobertura sempre explícita). Ver comentário da interface
+// SimulacaoCustoRow para detalhe.
 //
 // ============================================================================
 // [TASK-29] MOTOR DE FILTRO GLOBAL — FASE 1 (2026-09-12). Página piloto.

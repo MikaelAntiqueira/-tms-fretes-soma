@@ -115,7 +115,11 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
 - [ ] Validar cada tabela portada campo a campo
 
 ### Funcionalidades
-- [ ] Simulação de Custo por Transportadora (4º bloco da Visão Geral) — regra "nunca estima, sempre real"
+- [x] ~~Simulação de Custo por Transportadora (4º bloco da Visão Geral)~~ — **portada 2026-09-14**
+      (RPC `financeiro_simulacao_custo`, migration `fn_financeiro_simulacao_custo`). Regra "nunca
+      estima" preservada; validado com Leomar filtrada (394 processos, R$37.011,91 real) — São
+      Miguel/Santa Cruz mais baratas com boa cobertura, Fritz/Rede Nacional cobertura baixa
+      (só competem na janela Meio-dia), consistente com o caso já conhecido [DEC-22].
 - [ ] Área administrativa de importação de arquivos (usar policy nova de importacoes)
 
 ## Auth e segurança — RESOLVIDO 2026-09-14 (doc estava desatualizada, corrigida agora)
