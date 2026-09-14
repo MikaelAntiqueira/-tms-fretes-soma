@@ -3,6 +3,36 @@
 > Tarefas abertas e esperando ação. Última atualização: 2026-09-14.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
 
+## ✅ RESOLVIDO 2026-09-14 — 500 em /operacao: causa raiz real era timeout de DB, não (só) o middleware
+
+A task #15 (sessão anterior, mesmo dia) tinha corrigido a duplicação
+`middleware.ts`/`proxy.ts` como hipótese para o 500 relatado pelo Mikael em
+`/operacao` e `/oportunidades`, mas marcou como "não confirmado 100%". Task
+#16 achou a causa raiz real de `/operacao`, com **prova em log** (não
+hipótese): `postgrest_logs`/`postgres_logs` mostram 5x `POST /rpc/
+operacao_por_janela` → 500 em 2026-09-14T12:10, "canceling statement due to
+statement timeout". Motivo: a página disparava 7 RPCs num só `Promise.all`,
+5 delas recomputando de forma concorrente a mesma view cara
+`v_operacao_base` (~900ms isolada) — sob contenção, isso passa do
+`statement_timeout=8s` do role `authenticated` (bem menor que o do
+postgres/service_role, por isso não reproduzia em testes diretos no banco).
+
+**Correção** (migration `fix_operacao_dashboard_estatico_reduz_recomputo_v_
+operacao_base` + commit `393a6b7` em `src/app/operacao/page.tsx`): nova RPC
+`operacao_dashboard_estatico()` materializa a view 1 vez para as 4
+agregações estáticas (kpis/carriers/janela×transportadora/cidades),
+retornando tudo num único jsonb — reduz de 5 para 2 os recomputos
+concorrentes de `v_operacao_base` por carregamento de página. Regredido:
+números idênticos às functions antigas (mantidas no banco, só não são mais
+chamadas por `/operacao`). Detalhe completo em [D-26], `LOG_DECISOES.md`.
+
+**Não confirmado ainda**: não há como testar em produção com sessão
+autenticada sem logar como o Mikael (ação que não posso executar). Falta
+ele confirmar que o erro não volta em uso normal. Nenhum 500 de
+`/oportunidades` apareceu nos logs das últimas 24h (só `operacao_por_
+janela`) — se `/oportunidades` ainda falhar, o padrão a investigar é
+diferente deste.
+
 ## ✅ RESOLVIDO 2026-09-14 — página /oportunidades estava quebrada em produção
 
 Task #5 (validação campo a campo) encontrou que `/oportunidades` retornava
@@ -135,7 +165,10 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       do repo (commits `6192324`, `e94d1ac`, `c280bae`, `9884768`), usa `@supabase/ssr` +
       `getUser()` pra revalidar o token a cada requisição. `/login` ajustado com `?redirect=`
       de volta pra página original. Testado em produção: `/financeiro` sem sessão redireciona
-      corretamente pra `/login?redirect=/financeiro`.
+      corretamente pra `/login?redirect=/financeiro`. **Nota 2026-09-14**: o arquivo em si foi
+      renomeado pra `src/proxy.ts` numa sessão posterior (Next.js 16 depreciou o nome
+      `middleware.ts` — ver comentário no topo de `proxy.ts`); a lógica/comportamento descritos
+      aqui continuam os mesmos, só o arquivo mudou de nome.
 - [x] `v_cotacao_filtros` — achado à parte (não relacionado ao middleware): faltava
       `security_invoker=true`, bypassando RLS nesse endpoint específico mesmo com o resto
       correto. Corrigido 2026-09-14, ver [D-23] em LOG_DECISOES.md.
