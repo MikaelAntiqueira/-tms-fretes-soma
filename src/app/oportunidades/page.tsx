@@ -7,8 +7,12 @@ import { OportunidadesTabsClient } from "./OportunidadesTabsClient";
 // Página "Oportunidades" — sub-abas:
 //   1. Classificação  (🔴🟠🔵🟢⚠️ — tabela + KPIs)
 //   2. Clientes Prioritários (top clientes por impacto)
-// [TASK-34] Fase 2 — builds sobre a view comparacoes criada em
-// 2026091303_create_comparacoes_view.sql.
+// [TASK-34] Fase 2 — builds sobre a view comparacoes, corrigida em
+// 2026-09-14 (ver supabase/migrations/2026091303_create_comparacoes_view.sql)
+// para ser construída SOBRE v_ontem_comparacao — mesma fonte de verdade de
+// diffR/diffP/esc já usada em /financeiro e /ontem — em vez do ROW_NUMBER()
+// ingênuo original, que nunca chegou a rodar (colunas inexistentes) e
+// divergiria do recorte de janela "Meio-dia" se apenas remendado.
 // A lógica de classificação aqui é idêntica ao _classificar() do
 // enrich_dashboard_data.py (regra FINAL, não reinterpretar).
 //
@@ -44,7 +48,7 @@ const COLORS: Record<string, string> = {
 // 2026091303_create_comparacoes_view.sql)
 // ---------------------------------------------------------------------------
 export interface ComparacaoRow {
-  contratacao_id: number;
+  contratacao_id: string;
   pedido: string;
   nf: string;
   data_contratacao: string;
@@ -177,7 +181,7 @@ async function fetchComparacoes(filtros: {
   }
 
   const rows: ComparacaoRow[] = filtered.map((r) => ({
-    contratacao_id:            Number(r.contratacao_id ?? 0),
+    contratacao_id:            String(r.contratacao_id ?? ""),
     pedido:                    String(r.pedido ?? ""),
     nf:                        String(r.nf ?? ""),
     data_contratacao:          String(r.data_contratacao ?? ""),

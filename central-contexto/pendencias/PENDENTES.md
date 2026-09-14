@@ -3,22 +3,35 @@
 > Tarefas abertas e esperando ação. Última atualização: 2026-09-14.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
 
-## 🔴🔴 URGENTE — página /oportunidades quebrada em produção (achado 2026-09-14)
+## ✅ RESOLVIDO 2026-09-14 — página /oportunidades estava quebrada em produção
 
-Task #5 (validação campo a campo) encontrou que `/oportunidades` retorna erro
-pra todo visitante desde o commit que a criou (`12a4916`): a página consulta
-`supabase.from("comparacoes")`, mas essa view **não existe no banco** — o
-arquivo de migration que deveria criá-la
-(`supabase/migrations/2026091303_create_comparacoes_view.sql`) nunca foi
-aplicado, e não rodaria mesmo se alguém tentasse (referencia 3 colunas que
-não existem em `contratacoes`). Isso também bloqueia o `chartClassif`
-portado na task #2 — o gráfico está certo, mas nunca recebeu dado real.
-Além do bug de colunas, a lógica de "melhor preço" dessa migration é
-diferente (mais simples, sem o recorte de janela Meio-dia) da usada no
-resto do app — corrigir só as colunas criaria uma segunda fonte de verdade
-divergente. Detalhe completo + SQL de referência em
-`central-contexto/decisoes/VALIDACAO_23_ITENS.md`. Precisa de decisão antes
-de qualquer correção — não é um ajuste de 5 minutos.
+Task #5 (validação campo a campo) encontrou que `/oportunidades` retornava
+erro pra todo visitante desde o commit que a criou (`12a4916`): a página
+consultava `supabase.from("comparacoes")`, mas essa view não existia no
+banco (o arquivo de migration original referenciava 3 colunas inexistentes
+em `contratacoes` e nunca chegou a rodar). Isso também bloqueava o
+`chartClassif` da task #2.
+
+**Correção aplicada** (2 migrations no projeto Supabase
+`jpoizkylaffircimxzrq`: `fix_create_comparacoes_view_sobre_v_ontem_comparacao`
++ `fix_comparacoes_dedup_ofertas_duplicadas_prazo_contratado`; arquivo local
+`supabase/migrations/2026091303_create_comparacoes_view.sql` reescrito pra
+refletir o estado final): `comparacoes` foi reconstruída SOBRE
+`v_ontem_comparacao` (mesma fonte de verdade de diffR/diffP/esc do resto do
+app) em vez do ROW_NUMBER() ingênuo original, evitando a segunda fonte de
+verdade divergente que a recomendação do audit já tinha sinalizado.
+No caminho, achado um bug adicional: `ofertas` tem registros duplicados
+(mesma cotação+transportadora+preço, import duplicado) que multiplicavam a
+linha da contratação num JOIN não agregado — corrigido agregando por
+`(cotacao_id, transportadora_id)`. Validado: **5.196 linhas, soma
+diffR>0 = R$ 45.957,95 — bate exatamente com `v_ontem_comparacao`**, sem
+divergência. Também corrigido `ComparacaoRow.contratacao_id` no front
+(`page.tsx`): era tipado/convertido como `number` (`Number(uuid)` = `NaN`
+sempre), quebrando a `key` de React na tabela; agora é `string`. Limpeza:
+função órfã `fn_janela` (resíduo de tentativa anterior) removida; `search_path`
+fixado em `fn_faixa_peso`/`fn_faixa_cubagem` (lint de segurança do Supabase).
+Build de produção (`next build`) rodou limpo depois da correção — ver item
+"tsc/build limpo" abaixo, também resolvido por tabela.
 
 ## Filtro Global — Fase 1 (11/11 dimensões prontas, 2026-09-14)
 
@@ -29,8 +42,10 @@ de qualquer correção — não é um ajuste de 5 minutos.
       2026-09-14). `v_cotacao_filtros` estendida reaproveitando `v_financeiro_padroes_base`/
       bins de `financeiro_peso_frete`/CASE de janela de `transportadoras_comparativo` — nenhuma
       lógica nova. Baseline validado sem regressão (494.417,43 / 6.915 / 5.194 / 45.938,44).
-      **Pendente**: confirmação de `tsc`/`build` limpo (rodar na máquina do Hermes — a principal
-      ficou sem RAM pro `npm install`).
+      **✅ Confirmado 2026-09-14**: `npm run build` (Next.js 16 / Turbopack) rodou limpo —
+      compilação, checagem de TypeScript e geração de todas as 10 rotas sem erro (validado numa
+      máquina com RAM suficiente pro `npm install`; único ruído foram os fetches de Google Fonts
+      bloqueados pela rede do sandbox de validação, sem relação com o código).
 
 - [x] Implementar cascata de opções — RPC `financeiro_filtro_opcoes_cascata`, commit da sessão
       principal 2026-09-14. Sai "de graça" no mesmo round-trip (página já é Server Component

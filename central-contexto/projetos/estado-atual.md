@@ -58,6 +58,7 @@ Migração do dashboard "Frete Cotado × Frete Contratado" do Grupo SOMA/RS de H
 | Operação | /operacao | ✅ | Controle Operacional de Carregamento, janela Meio-dia × Tarde |
 | Financeiro | /financeiro | ✅ | 4 sub-abas: Visão Geral, Cotado×Contratado, Padrões da Diferença, Peso/Cubagem/Custo |
 | Transportadoras | /transportadoras | ✅ | 5 sub-abas: Comparativo, Preço×Prazo, Região Comercial, Clientes, Cidades |
+| Oportunidades | /oportunidades | ✅ (corrigida 2026-09-14) | View `comparacoes` reconstruída sobre `v_ontem_comparacao` — estava quebrada desde a criação, ver PENDENTES.md |
 
 ## Componentes-chave
 
