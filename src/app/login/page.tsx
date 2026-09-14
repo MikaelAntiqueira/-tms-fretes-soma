@@ -8,18 +8,17 @@
 // usando os tokens visuais já existentes (.card/.app-shell, cores da
 // paleta em globals.css) — sem inventar componente novo de layout.
 //
-// NÃO há middleware de redirecionamento forçado nesta etapa (decisão
-// deliberada, ver README, seção "Supabase Auth"): visitar esta página é
-// opcional, e o site inteiro continua público sem login. Depois de logar,
-// redireciona para "/" só para voltar ao dashboard — não desbloqueia
-// nenhuma área exclusiva ainda.
+// Middleware de redirecionamento (agent_tasks#3 e #10, 2026-09-14): quem
+// não tem sessão é mandado pra cá automaticamente ao tentar acessar
+// qualquer página do dashboard, com ?redirect=<rota original> — o submit
+// abaixo lê esse parâmetro e volta pra lá em vez de ir sempre pra "/".
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,7 +39,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    const destino = searchParams.get("redirect") || "/";
+    router.push(destino);
     router.refresh();
   }
 
@@ -49,9 +49,9 @@ export default function LoginPage() {
       <div className="card login-card">
         <h1>Entrar</h1>
         <p className="sub">
-          Acesso administrativo do TMS Fretes SOMA. O site continua público para
-          qualquer visitante sem login — entrar aqui só mostra sua sessão ativa,
-          ainda não desbloqueia nenhuma área exclusiva.
+          Acesso ao TMS Fretes SOMA. É preciso estar logado para ver o
+          dashboard — sem sessão, você é redirecionado pra cá
+          automaticamente.
         </p>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -92,10 +92,6 @@ export default function LoginPage() {
           Esqueceu a senha ou ainda não definiu uma? Use o link enviado por
           e-mail pelo Supabase Auth (convite/recuperação de senha) — nenhuma
           senha é definida por este site.
-        </p>
-
-        <p className="login-note">
-          <Link href="/">← Voltar para o dashboard sem logar</Link>
         </p>
       </div>
     </div>
