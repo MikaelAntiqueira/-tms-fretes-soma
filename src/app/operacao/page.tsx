@@ -25,6 +25,37 @@ import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 // `transportadoras.frete_minimo_observado`, nunca hardcoded no TS.
 //
 // ============================================================================
+// [FIX 2026-09-14] 500 em produção — recomputo redundante de v_operacao_base
+// ============================================================================
+// Achado com prova em log: esta página disparava, num único Promise.all, 7
+// RPCs — 4 delas (operacao_kpis, operacao_por_transportadora, operacao_por_
+// janela_transportadora, operacao_por_cidade) recomputavam de forma
+// INDEPENDENTE e CONCORRENTE a mesma view cara `v_operacao_base` (~900ms
+// sozinha, warm cache — medido via EXPLAIN ANALYZE). Rodando as 4 ao mesmo
+// tempo (mais a 5ª, operacao_por_janela, que também toca v_operacao_base),
+// qualquer contenção ou cache frio empurra o tempo real acima do
+// `statement_timeout` do role `authenticated` (8s — bem menor que os 2min do
+// role padrão/postgres). Isso gerou 5 timeouts reais capturados em
+// `postgrest_logs`/`postgres_logs` em 2026-09-14T12:10 (`POST /rpc/
+// operacao_por_janela` → 500, "canceling statement due to statement
+// timeout") — a causa raiz real do "erro 500 em /operacao" relatado pelo
+// Mikael, distinta da duplicação de middleware.ts/proxy.ts corrigida numa
+// sessão anterior (essa resolvia o guard de auth, não este timeout).
+//
+// Correção (migration `fix_operacao_dashboard_estatico_reduz_recomputo_v_
+// operacao_base`, ver [D-26] em LOG_DECISOES.md): nova RPC
+// `operacao_dashboard_estatico()` materializa v_operacao_base UMA vez e
+// deriva dela as 4 agregações estáticas (kpis/carriers/janela×transportadora/
+// cidades), retornando tudo num único jsonb. `operacao_por_janela` continua
+// separada (é a única com os 4 parâmetros do filtro global — combiná-la
+// aqui obrigaria a recomputar tudo a cada mudança de filtro), mas sua CTE
+// interna ganhou `materialized` como segurança adicional. Resultado: 5
+// recomputos concorrentes de v_operacao_base por carregamento →  2.
+// As 4 functions antigas (operacao_kpis, operacao_por_transportadora,
+// operacao_por_janela_transportadora, operacao_por_cidade) foram mantidas no
+// banco (não removidas) — regredidas contra o novo RPC, números idênticos.
+//
+// ============================================================================
 // [TASK-29] MOTOR DE FILTRO GLOBAL — FASE 1, continuação /operacao
 // (2026-09-12/13). Estende para esta página o MESMO padrão já usado em
 // /financeiro (ver comentário completo em src/components/FilterBar.tsx e no
@@ -164,6 +195,15 @@ interface FiltrosOperacao {
   tipos: string[] | null;
 }
 
+// Shape do jsonb retornado por operacao_dashboard_estatico() — ver
+// comentário [FIX 2026-09-14] no topo do arquivo.
+interface DashboardEstatico {
+  kpis?: Record<string, unknown> | null;
+  carriers?: Record<string, unknown>[];
+  janela_carriers?: Record<string, unknown>[];
+  cidades?: Record<string, unknown>[];
+}
+
 async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> {
   const supabase = await createSupabaseServerClient();
   const filtroArgs = {
@@ -173,23 +213,25 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
     p_tipos: filtros.tipos,
   };
 
-  const [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes, mesesRes, opcoesRes] = await Promise.all([
-    // ---- sempre a base completa nesta etapa (ver comentário do topo) ----
-    supabase.rpc("operacao_kpis"),
-    supabase.rpc("operacao_por_transportadora"),
+  const [dashRes, janelasRes, mesesRes, opcoesRes] = await Promise.all([
+    // ---- [FIX 2026-09-14] 1 RPC só para as 4 agregações estáticas (antes
+    // eram operacao_kpis + operacao_por_transportadora + operacao_por_
+    // janela_transportadora + operacao_por_cidade, cada uma recomputando
+    // v_operacao_base do zero — ver comentário no topo do arquivo) ----
+    supabase.rpc("operacao_dashboard_estatico"),
     // ---- única RPC desta página que já tem os 4 parâmetros — reage ao filtro ----
     supabase.rpc("operacao_por_janela", filtroArgs),
-    supabase.rpc("operacao_por_janela_transportadora"),
-    supabase.rpc("operacao_por_cidade"),
     // ---- opções completas (sem cascata) para os dropdowns do FilterBar ----
     supabase.rpc("filtro_opcoes_mes"),
     supabase.rpc("financeiro_filtro_opcoes"),
   ]);
-  for (const res of [kpisRes, carriersRes, janelasRes, janelaCarriersRes, cidadesRes, mesesRes, opcoesRes]) {
+  for (const res of [dashRes, janelasRes, mesesRes, opcoesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
-  const kpisRow = (kpisRes.data as Record<string, unknown>[])?.[0];
+  const dash = (dashRes.data ?? {}) as DashboardEstatico;
+
+  const kpisRow = dash.kpis ?? undefined;
   const kpis: OperacaoKpis | null = kpisRow
     ? {
         n_romaneios: Number(kpisRow.n_romaneios ?? 0),
@@ -201,7 +243,7 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
       }
     : null;
 
-  const carriers: CarrierRow[] = ((carriersRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const carriers: CarrierRow[] = (dash.carriers ?? []).map((r) => ({
     transportadora: String(r.transportadora),
     n_romaneios: Number(r.n_romaneios ?? 0),
     n_pedidos: Number(r.n_pedidos ?? 0),
@@ -222,15 +264,13 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
     soma_frete_contratado: Number(r.soma_frete_contratado ?? 0),
   }));
 
-  const janelaCarriers: JanelaCarrierRow[] = ((janelaCarriersRes.data as Record<string, unknown>[]) ?? []).map(
-    (r) => ({
-      janela: String(r.janela),
-      transportadora: String(r.transportadora),
-      soma_frete_contratado: Number(r.soma_frete_contratado ?? 0),
-    })
-  );
+  const janelaCarriers: JanelaCarrierRow[] = (dash.janela_carriers ?? []).map((r) => ({
+    janela: String(r.janela),
+    transportadora: String(r.transportadora),
+    soma_frete_contratado: Number(r.soma_frete_contratado ?? 0),
+  }));
 
-  const cidades: CidadeRow[] = ((cidadesRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const cidades: CidadeRow[] = (dash.cidades ?? []).map((r) => ({
     cidade: String(r.cidade),
     transportadora: String(r.transportadora),
     n_romaneios: Number(r.n_romaneios ?? 0),
