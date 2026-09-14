@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ComparacaoRow } from "./page";
+import { ClassificacaoChart } from "@/components/ClassificacaoChart";
 
 // Componente de tabs (client-side state para alternar entre abas)
 function OportunidadesTabsClient({
@@ -93,13 +94,18 @@ function OportunidadesTabsClient({
       <div className="subpage-content">
         {activeTab === "classificacao" && (
           <>
-            {/* Doughnut de classificação (tabela + legenda, sem Chart.js neste estágio) */}
+            {/* Doughnut de classificação + tabela + legenda */}
             <section className="bloc" style={{ marginTop: 8 }}>
               <div className="bloc-head">
                 <h2>Classificação por impacto</h2>
                 <div className="desc">🟢 = mais barata · 🔵 = baixo · 🟠 = médio · 🔴 = alto · ⚠️ = amostra insuficiente</div>
               </div>
-              <div className="grid cols2-even">
+              <ClassificacaoChart
+                counts={{ verde: verdeCount, azul: azulCount, laranja: laranjaCount, vermelho: vermelhoCount, alerta: alertaCount }}
+                order={classifOrder}
+                colors={colors}
+              />
+              <div className="grid cols2-even" style={{ marginTop: 14 }}>
                 {/* Resumo por classificação */}
                 <div className="card">
                   <h3>Contagem por classificação</h3>
