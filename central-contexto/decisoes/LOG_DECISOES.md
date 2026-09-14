@@ -117,6 +117,16 @@
 
 **Motivo**: Página Cidades na migração mostra o universo completo (diferente da seção "Cidade × Transportadora" de /operacao que mostra só top 15).
 
+## D-21 — Filtro Global: as 7 dimensões restantes reaproveitam colunas já existentes
+
+**Decisão**: `v_cotacao_filtros` foi estendida com romaneio/esc/prazo/cidade/janela/faixaPeso/
+faixaCubagem reaproveitando exatamente as colunas/faixas já calculadas em
+`v_financeiro_padroes_base`, nos bins de `financeiro_peso_frete` e no CASE de janela de
+`transportadoras_comparativo` — nenhuma faixa/bucket novo foi inventado.
+
+**Motivo**: princípio de não duplicar lógica de negócio; qualquer mudança futura nas faixas de
+peso/cubagem só precisa ser feita em um lugar.
+
 ## D-20 — "Região Comercial" em /financeiro usa regiao_normalizada
 
 **Decisão**: Em /financeiro, sub-aba "Padrões da Diferença" → "Diferença por Região", usa `regiao_normalizada` (mesmo campo de RegiaoComercialChart.tsx), nunca a bruta.

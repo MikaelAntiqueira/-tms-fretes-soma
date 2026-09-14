@@ -3,17 +3,25 @@
 > Tarefas abertas e esperando ação. Última atualização: 2026-09-13.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
 
-## Filtro Global — Fase 1 (em andamento)
+## Filtro Global — Fase 1 (11/11 dimensões prontas, 2026-09-14)
+
+- [x] Completar as 7 dimensões restantes do Filtro Global:
+      romaneio, esc (escolheu a mais barata), prazo, cidade, janela, faixaPeso, faixaCubagem —
+      migrations `fn_filtro_global_fase1_7_dimensoes_restantes` +
+      `fn_filtro_opcoes_add_cidade_romaneio_prazo`, commit `0ffce75` (sessão principal,
+      2026-09-14). `v_cotacao_filtros` estendida reaproveitando `v_financeiro_padroes_base`/
+      bins de `financeiro_peso_frete`/CASE de janela de `transportadoras_comparativo` — nenhuma
+      lógica nova. Baseline validado sem regressão (494.417,43 / 6.915 / 5.194 / 45.938,44).
+      **Pendente**: confirmação de `tsc`/`build` limpo (rodar na máquina do Hermes — a principal
+      ficou sem RAM pro `npm install`).
 
 ### A fazer agora
-- [ ] Completar as 7 dimensões restantes do Filtro Global:
-      romaneio, esc (escolheu a mais barata), prazo, cidade, janela, faixaPeso, faixaCubagem
 - [ ] Implementar cascata de opções (dropdown filtrado por outros filtros ativos)
 - [ ] Fazer outras páginas reagirem ao filtro (além de /financeiro Visão Geral)
-- [ ] Validar filtro em todas as páginas afetadas
+- [ ] Validar as 11 dimensões campo a campo contra o Artifact original (só as 4 da Fase 1 foram
+      validadas por Playwright até agora)
 
 ### Dependências
-- RPCs com parâmetros opcionais para as 7 dimensões restantes
 - Client-side cascade logic (ou extensão das RPCs existentes)
 
 ## Dashboard completo (fase futura)

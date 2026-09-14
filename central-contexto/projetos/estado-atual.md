@@ -40,11 +40,14 @@ Migração do dashboard "Frete Cotado × Frete Contratado" do Grupo SOMA/RS de H
 - Página inicial com 4 KPIs reais do Supabase
 - Validação: Frete Contratado cruzado = R$ 494.417,43 (deve bater — se não bater, é bloqueio)
 
-### Fase 1 — Filtro Global (EM ANDAMENTO)
-- Motor de filtro com 4 dimensões portadas: Mês, Transportadora Contratada, Região Comercial, Tipo Cliente
-- Aplicado em /financeiro (sub-aba Visão Geral), /operacao, /transportadoras
-- 7 dimensões restantes pendentes: romaneio, esc, prazo, cidade, janela, faixaPeso, faixaCubagem
-- Cascade de opções NÃO implementada (limitação deliberada desta fase)
+### Fase 1 — Filtro Global (11/11 dimensões, 2026-09-14 — falta validar campo a campo)
+- Motor de filtro com as 11 dimensões portadas: Mês, Transportadora Contratada, Região Comercial,
+  Tipo Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de Peso, Faixa de
+  Cubagem (commit `0ffce75`)
+- Só a sub-aba Visão Geral de /financeiro reage (mesmo escopo de sempre — não expandido)
+- Cascade de opções continua NÃO implementada (limitação deliberada, ver PENDENTES.md)
+- Falta: `tsc`/`build` limpo confirmado (pedido ao Hermes) e validação campo a campo das 7 novas
+  dimensões contra o Artifact original (só as 4 da Fase 1 foram validadas por Playwright)
 
 ## Páginas portadas
 
