@@ -72,11 +72,28 @@
 - [ ] Simulação de Custo por Transportadora (4º bloco da Visão Geral) — regra "nunca estima, sempre real"
 - [ ] Área administrativa de importação de arquivos (usar policy nova de importacoes)
 
-## Auth e segurança (fase futura)
+## Auth e segurança — CORRIGIDO 2026-09-14 (doc estava desatualizada)
 
-- [ ] Remover policies de leitura pública temporárias (decisão futura do Mikael)
-- [ ] Implementar middleware de redirecionamento para /login (após remover policies públicas)
-- [ ] Proteger páginas administrativas
+> Auditoria (task #3, sessão principal): conferi as policies reais no banco (`pg_policies`),
+> não só o que os docs diziam. **As 5 tabelas de dado (`clientes`, `cotacoes`, `ofertas`,
+> `contratacoes`, `transportadoras`) já estão com SELECT restrito a `authenticated`** —
+> migration `restringir_leitura_a_usuarios_autenticados` (2026-09-12). Isso contradiz D-10/D-13
+> abaixo e o estado descrito antes aqui ("policies públicas mantidas") — os docs nunca foram
+> atualizados depois dessa migration.
+
+- [x] ~~Remover policies de leitura pública temporárias~~ — JÁ FEITO em 2026-09-12, antes até
+      da Central de Contexto existir (por isso o doc nunca refletiu)
+- [ ] **Decisão do Mikael necessária**: isso foi intencional ou foi uma trava excessiva de uma
+      sessão anterior? PRINCIPIOS.md diz explicitamente "policy de leitura pública temporária
+      apenas durante a fase de desenvolvimento aberto" — se ainda estamos nessa fase, a leitura
+      deveria ter voltado a ser pública, não o contrário.
+- [ ] **Se a resposta for "manter autenticado"**: implementar middleware de redirecionamento
+      para /login É URGENTE, não "fase futura" — sem ele, qualquer visitante deslogado hoje só
+      vê páginas com todos os KPIs/gráficos vazios (RLS devolve 0 linhas pro role `anon`, sem
+      nenhum aviso), não um login. Isso pode já estar acontecendo em produção agora.
+- [ ] **Se a resposta for "reverter pra pública"**: recriar as policies antigas (`for select
+      using (true)` pro role anon, mesmo padrão de antes de 2026-09-12).
+- [ ] Proteger páginas administrativas (independente da resposta acima)
 
 ## Melhorias de qualidade
 

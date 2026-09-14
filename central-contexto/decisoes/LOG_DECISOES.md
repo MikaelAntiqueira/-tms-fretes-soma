@@ -63,6 +63,13 @@
 
 **Motivo**: Mikael usa o site publicamente agora. Remover exigiria Auth em todas as páginas, o que não é o objetivo desta fase. Decisão futura do Mikael remover.
 
+**⚠️ CORREÇÃO 2026-09-14 (task #3, auditoria Auth/Segurança)**: esta decisão está **desatualizada**.
+A migration `restringir_leitura_a_usuarios_autenticados` (2026-09-12) já trocou as 5 policies para
+`authenticated`-only — o oposto do que este D-10 registra. Ninguém atualizou este log depois
+daquela migration. Ver `pendencias/PENDENTES.md` seção "Auth e segurança" para o que isso implica
+e a decisão que falta do Mikael (foi intencional? falta middleware pra não deixar visitante
+deslogado vendo o site vazio?).
+
 ## D-11 — Sem middleware nesta fase
 
 **Decisão**: Não implementar middleware de redirecionamento para /login nesta fase.
