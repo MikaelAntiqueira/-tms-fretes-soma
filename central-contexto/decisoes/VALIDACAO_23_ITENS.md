@@ -87,6 +87,79 @@ RPC: `transportadoras_comparativo()`. Implementação sofisticada — replica o 
   Hipótese mais provável (não confirmada): LKW cotou só 44 vezes no total, e boa parte dessas cotações **LKW foi a ÚNICA transportadora que cotou** (nenhuma concorrência real) — nessas linhas ela "vence" trivialmente por não ter com quem competir. Se o pipeline Python original excluía linhas com só 1 oferta do denominador/numerador de "% Vezes Mais Barata" (coerente com a regra R-DIFERENÇA: "sem alternativa comprovada, sem critério disponível"), isso explicaria a queda de ~95% pra ~1%. Fritz Express e Rede Nacional são exatamente as duas transportadoras com tratamento especial no recorte de janela Meio-dia (sempre candidatas, mesmo sem ser a mais barata "de verdade") — pode ser um efeito colateral dessa regra inflando o placar delas.
   **Não tenho acesso ao script Python original (`enrich_dashboard_data.py`) pra confirmar a definição exata** — reportando o achado com a evidência, não uma correção. Antes de mexer nisso, vale checar com o Mikael/a fonte original se cotações com 1 única oferta devem contar para este indicador.
 
-## Pendente nesta auditoria (ainda não verificados nesta sessão)
-- Gráficos: chartQuadrante (`PrecoPrazoChart.tsx`), chartUf (`RegiaoComercialChart.tsx`), chartClientes (`ClientesChart.tsx`)
-- Tabelas: tblPrazoHist, tblCidades (`transportadoras/page.tsx`), ontTabela (`ontem/page.tsx`), tblOportunidades (`OportunidadesTabsClient.tsx`), opQuem, opCidades (`operacao/page.tsx`)
+## 🔴🔴 ACHADO CRÍTICO — página /oportunidades está QUEBRADA em produção
+
+Não é uma divergência de fórmula como as duas acima — é uma **página que
+retorna erro pra todo visitante**, desde antes desta sessão de validação
+(o bug já estava no commit `12a4916`, que criou a página).
+
+**O que está quebrado**: `src/app/oportunidades/page.tsx` faz
+`supabase.from("comparacoes").select("*")` — mas a view/tabela `comparacoes`
+**não existe no banco** (`select * from comparacoes` → `ERROR: 42P01:
+relation "comparacoes" does not exist`; confirmado também via `pg_class` e
+via `supabase_migrations.schema_migrations`, que não tem nenhum registro de
+migration aplicada com "comparacoes" no nome). A página captura o erro num
+`try/catch` e mostra o banner "Não foi possível consultar o Supabase" em vez
+de quebrar feio — mas **nenhum visitante consegue ver Classificação nem
+Clientes Prioritários hoje**, isso inclui o `chartClassif` que eu portei na
+task #2: o código do gráfico está certo, mas nunca renderizou com dado real
+porque a busca falha antes de chegar nele.
+
+**Por que nunca foi aplicada**: o arquivo de migration existe no repo
+(`supabase/migrations/2026091303_create_comparacoes_view.sql`, commitado
+junto com a página em `12a4916`) mas **nunca chegou a rodar no Postgres** —
+e não rodaria mesmo que alguém tentasse: ele referencia 3 colunas que não
+existem em `contratacoes` (`c.hr`, `c.prazo_dias`, `c.cubagem_m3` — conferido
+no schema real: `contratacoes` não tem nenhuma das três; `cubagem_m3` existe
+em `cotacoes`, não em `contratacoes`; `prazo_dias` só existe em `ofertas`).
+A migration foi escrita contra um desenho de schema anterior/hipotético, não
+contra o schema que acabou sendo criado.
+
+**Problema mais profundo que só corrigir as colunas não resolve**: mesmo
+corrigindo os nomes de coluna, a lógica de "melhor preço"/`diffR`/`diffP`/
+`esc` desta migration é um `ROW_NUMBER() OVER (PARTITION BY cotacao_id ORDER
+BY preco_final ASC)` **ingênuo** — não implementa o recorte de janela
+"Meio-dia" (só Rede Nacional/Fritz Express competem nesse horário) que
+`v_ontem_comparacao` e `transportadoras_comparativo()` já implementam
+corretamente e que o resto do app inteiro usa como única fonte de verdade
+pra esses 4 campos. Se essa view for só "consertada" pra rodar, ela vai
+produzir `diffR`/`esc`/classificação **diferentes** dos mesmos processos
+mostrados em `/financeiro` e `/ontem` — exatamente o Risco Nº1 do mapa de
+migração ("recriar 'menor frete = melhor decisão' com uma query mais
+simples, perdendo a nuance já resolvida em outro lugar").
+
+**Recomendação (não aplicada — decisão de arquitetura, não só bug-fix)**:
+reconstruir `comparacoes` como uma view SOBRE `v_ontem_comparacao` (que já
+tem `diferenca_r`/`diferenca_pct`/`escolheu`/`melhor_cotacao` corretos) +
+join com `clientes`/`cotacoes` pros campos extras (`faixa_peso`,
+`faixa_cubagem`, `tipo_cliente`) + o cálculo de `classif`/`risco_prazo_alt`/
+`oportunidade_prazo` por cima (esses 3 cálculos em si — percentil por grupo,
+selo Leomar, oportunidade de prazo — parecem corretos na migration
+original, o problema é só a BASE de diffR/esc que eles usam). Não tentei
+escrever essa versão corrigida nem aplicar nada — é uma mudança grande o
+suficiente (e a permissão de `apply_migration` já foi negada uma vez nesta
+sessão para uma correção bem menor) que pede aprovação explícita antes de
+qualquer tentativa.
+
+## Transportadoras — demais gráficos/tabelas
+
+- ✅ **chartQuadrante** (`PrecoPrazoChart.tsx`) — RPC `transportadoras_prazo_medio()` usa o mesmo padrão `dedup_contr` (via `v_ontem_radar`) já validado em `transportadoras_comparativo` (cujo `pct_contratada` bateu exato com a referência). Fórmula (prazo médio da oferta vencedora por transportadora contratada) confere com `renderTransportadoras` linha ~1996. Não recomputei o prazo médio contra uma referência externa (a planilha só tem "PRAZO MÉDIO CONTRATADO" agregado, não por transportadora) — confiança alta, não 100% independente.
+- ✅ **chartUf** (`RegiaoComercialChart.tsx`) — RPC `transportadoras_regiao_comercial()`: soma `frete_contratado` por `regiao_normalizada`, sem limite; front-end corta top 15 e mostra "Top 15 de {N} Regiões Comerciais por valor contratado" — texto e corte batem exatamente com `renderUf` linha ~2072-2087.
+- ✅ **chartClientes** (`ClientesChart.tsx`) — RPC `transportadoras_clientes_metricas()`: agrega por cliente sobre TODA a base de cotações (`n_processos` conta cruzada+não cruzada, como o comentário do arquivo já documentava), `frete_contratado`/`diferenca_positiva` só somam onde não nulo/positivo. Bate com `renderClientes` linha ~2091-2111 (top 12 por métrica escolhida, cortado no componente React).
+- ⚠️ **tblPrazoHist** — RPC `transportadoras_prazo_hist()` usa `percentile_cont(0.5)` pra mediana. **Não consigo confirmar CONFERE ou DIVERGE com confiança**: ao contrário de `tblOutliers` (onde o cálculo do Artifact era JS ao vivo, visível), este dado vinha de `META.prazoHist`, pré-calculado pelo pipeline Python (`enrich_dashboard_data.py`, não disponível pra leitura) — não sei se o Python usava interpolação (bateria com `percentile_cont`) ou índice puro (bateria com o método usado em `tblOutliers`). Os `n` por transportadora batem na mesma ordem de grandeza da nota do dicionário ("LKW N=16, Minuano N=4, Rede Nacional N=57" vs atual LKW N=23, Minuano N=9, Rede Nacional N=55) — plausivelmente só deriva de dado novo entrando na base, não indício de bug. Reportando como incerteza, não como divergência confirmada.
+- ✅ **tblCidades** — RPC `transportadoras_cidades()`: agrega por (cidade, transportadora) sobre TODA a base (sem limite — [D-19] "Cidades retorna TODAS"), mesmas somas/médias de `_cidadeTranspAgg`/`renderCidades` (linha ~2677-2718), mesma ordenação (frete total da cidade desc, depois frete da linha desc).
+- ✅ **opQuem** (`operacao/page.tsx`) — RPC `operacao_por_transportadora()`: mesmo filtro (`n_pedidos>0 or frete>0`), mesma ordenação (frete desc). "Piso de frete observado" migrou do `PISO_OBS` hardcoded no JS (São Miguel 63,05 / Rede Nacional 46,20 / Fritz Express 30,25) pra coluna `transportadoras.frete_minimo_observado` — **valores conferidos direto no banco, batem exatamente** com os 3 hardcoded do Artifact, e `null` pros outros 4 (mesmo efeito visual do badge "Sem parâmetro").
+- ✅ **opCidades** — RPC `operacao_por_cidade(p_top_n=15)`: correto em ser limitado a TOP 15 (diferente de `tblCidades`/transportadoras, que mostra todas — [D-19] distingue exatamente essas duas telas). Mesmas somas de `_cidadeTranspAgg`.
+- ✅ **ontTabela** (`ontem/page.tsx`) — usa `ontem_kpis`/`ontem_contratacoes`, já sobre `v_ontem_comparacao`; o maior valor da lista (R$ 890,88) bate com "MAIOR OPORTUNIDADE INDIVIDUAL (R$)" da planilha de referência (conferido durante o trabalho de `dados_detalhe` na task #2).
+- 🔴🔴 **tblOportunidades** — **BLOQUEADA**, ver seção "ACHADO CRÍTICO" acima. A tabela em si (`OportunidadesTabsClient.tsx`, "Processos classificados — detalhe") está corretamente implementada, mas a fonte de dados (`view comparacoes`) não existe no banco — a página inteira retorna erro.
+
+## Resumo final — 23/23 itens revisados
+
+| Resultado | Qtd | Itens |
+|---|---|---|
+| ✅ CONFERE | 18 | chartDiffPrazo/Uf/Transp/Tipo, chartPeso/chartPrazo, tblCbmCusto, chartQuadrante, chartUf, chartClientes, tblCidades, opQuem, opCidades, ontTabela, + % Vezes Contratada de tblTransp |
+| ⚠️ Incerto (sem referência suficiente) | 1 | tblPrazoHist (percentil pode ou não bater com o pipeline Python original) |
+| 🔴 DIVERGE (achado real, não corrigido) | 2 | tblOutliers (percentil por índice vs interpolado); % Vezes Mais Barata de tblTransp |
+| 🔴🔴 QUEBRADO (página inteira sem dado) | 1 (afeta 2 itens) | tblOportunidades + chartClassif (task #2) — view `comparacoes` não existe |
+
+Achado menor (cosmético): coluna "Peso" de `tblOutliers` sem sufixo " kg" (usa `fmtNum` em vez de `fmtKg`).

@@ -1,7 +1,24 @@
 # Pendências — TMS Fretes SOMA
 
-> Tarefas abertas e esperando ação. Última atualização: 2026-09-13.
+> Tarefas abertas e esperando ação. Última atualização: 2026-09-14.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
+
+## 🔴🔴 URGENTE — página /oportunidades quebrada em produção (achado 2026-09-14)
+
+Task #5 (validação campo a campo) encontrou que `/oportunidades` retorna erro
+pra todo visitante desde o commit que a criou (`12a4916`): a página consulta
+`supabase.from("comparacoes")`, mas essa view **não existe no banco** — o
+arquivo de migration que deveria criá-la
+(`supabase/migrations/2026091303_create_comparacoes_view.sql`) nunca foi
+aplicado, e não rodaria mesmo se alguém tentasse (referencia 3 colunas que
+não existem em `contratacoes`). Isso também bloqueia o `chartClassif`
+portado na task #2 — o gráfico está certo, mas nunca recebeu dado real.
+Além do bug de colunas, a lógica de "melhor preço" dessa migration é
+diferente (mais simples, sem o recorte de janela Meio-dia) da usada no
+resto do app — corrigir só as colunas criaria uma segunda fonte de verdade
+divergente. Detalhe completo + SQL de referência em
+`central-contexto/decisoes/VALIDACAO_23_ITENS.md`. Precisa de decisão antes
+de qualquer correção — não é um ajuste de 5 minutos.
 
 ## Filtro Global — Fase 1 (11/11 dimensões prontas, 2026-09-14)
 
