@@ -123,6 +123,23 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    // "Dados" era acessível só pelo rodapé no Artifact original (fora do
+    // <nav> principal) — promovido pra cá (Portar gráficos e tabelas
+    // restantes, agent_tasks#2, 2026-09-14) porque este menu lateral já não
+    // tem um rodapé próprio equivalente, mesmo critério já usado antes pra
+    // "Oportunidades" (também rodapé/aba própria no original).
+    href: "/dados",
+    label: "Dados",
+    title: "Dados — tabela detalhada, 1 linha por processo, busca e paginação",
+    icon: (
+      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
+        <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+        <path d="M3.5 9.5h17" />
+        <path d="M8.5 9.5v10" />
+      </svg>
+    ),
+  },
 ];
 
 export function DashboardShell({ children, stats }: { children: ReactNode; stats?: ReactNode }) {
