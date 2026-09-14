@@ -114,7 +114,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/oportunidades",
     label: "Oportunidades",
-    title: "Oportunidades — ainda não portada (depende de decisão de negócio, ver ISSUE-23)",
+    title: "Oportunidades — Classificação de oportunidades de economia por impacto; diferença ≠ erro",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <circle cx="12" cy="12" r="8.5" />
@@ -122,7 +122,6 @@ const NAV_ITEMS: NavItem[] = [
         <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
       </svg>
     ),
-    disabled: true,
   },
 ];
 
