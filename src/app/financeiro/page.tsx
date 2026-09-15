@@ -324,9 +324,10 @@ interface FiltrosVisaoGeral {
 }
 
 // Rótulo de exibição do valor bruto "esc" (S/N/SC) — as OPÇÕES do dropdown
-// em si vêm da cascata (financeiro_filtro_opcoes_cascata), não daqui; isto
-// só formata o valor já filtrado pelo cascade.
-const ESC_LABELS: Record<string, string> = { S: "Sim", N: "Não", SC: "Sem comparação" };
+// em si vêm da cascata (financeiro_filtro_opcoes_cascata), não daqui. Movido
+// para fmtEscolheuLabel em @/lib/format.tsx — ver [FIX 2026-09-15, D-30] em
+// src/components/FilterBar.tsx (função não pode mais viver aqui, pois não
+// pode cruzar a fronteira Server → Client Component como valor de `format`).
 
 async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<FinanceiroData> {
   const supabase = await createSupabaseServerClient();
@@ -675,17 +676,17 @@ export default async function FinanceiroPage({
   // JANELA_OPTIONS, FAIXA_*_OPTIONS) foram removidas — ficaram redundantes
   // e sem uso assim que a cascata passou a alimentar os 11 dropdowns.
   const filterDimensions: FilterDimension[] = [
-    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: fmtMes },
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: opcoesTransportadoras },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
     { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
-    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: (v) => ESC_LABELS[v] ?? v },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: "esc" },
     {
       param: "prazo",
       labelAll: "Todos os prazos",
       options: opcoesPrazos.map(String),
-      format: (v) => `${v} dia${v === "1" ? "" : "s"}`,
+      format: "prazo",
     },
     { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
     { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelas },
