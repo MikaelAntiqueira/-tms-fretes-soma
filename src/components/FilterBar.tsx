@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { fmtMes, fmtEscolheuLabel, fmtPrazoDiasLabel } from "@/lib/format";
 
 // ============================================================================
 // FilterBar — motor de filtro global, [TASK-29]. Ver também o comentário no
@@ -78,6 +79,30 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 // `fn_filtro_global_fase1_visao_geral`), este componente só lê/escreve a URL.
 // ============================================================================
 
+// [FIX 2026-09-15, D-30] `format` era `(value: string) => string` — uma
+// FUNÇÃO passada como prop de um Server Component (as 4 páginas que
+// consomem <FilterBar>: /operacao, /financeiro, /transportadoras,
+// /oportunidades) para este Client Component ("use client" acima). React
+// Server Components não permite serializar uma função comum através dessa
+// fronteira (só Server Actions, explicitamente marcadas "use server") — em
+// runtime isso lançava "Error: Functions cannot be passed directly to
+// Client Components unless you explicitly expose it by marking it with
+// 'use server'... {param: 'mes', ..., format: function}", derrubando as 4
+// páginas com a tela genérica "This page couldn't load" da Vercel (nunca a
+// mensagem de erro da nossa própria aplicação — por isso o erro sobrevivia
+// a toda tentativa de fix no proxy.ts/timeout de RPC/env vars: a causa era
+// outra). Confirmado via Vercel Runtime Logs: mesmo `digest: "208308169"`
+// do print reportado pelo Mikael. Fix: `format` agora é uma CHAVE
+// serializável (string) resolvida para a função real aqui dentro do
+// próprio Client Component — nenhuma função cruza o boundary servidor→
+// cliente. Único uso hoje é a dimensão "mes" (fmtMes); novas chaves podem
+// ser adicionadas a FORMATTERS conforme necessário.
+const FORMATTERS: Record<string, (value: string) => string> = {
+  mes: fmtMes,
+  esc: fmtEscolheuLabel,
+  prazo: fmtPrazoDiasLabel,
+};
+
 export interface FilterDimension {
   /** nome do parâmetro na URL, ex. "mes" em ?mes=2026-07,2026-08 */
   param: string;
@@ -85,8 +110,9 @@ export interface FilterDimension {
   labelAll: string;
   /** lista COMPLETA de valores possíveis (sem cascata — ver comentário acima) */
   options: string[];
-  /** formatação opcional do valor bruto para exibição (ex. "2026-07" -> "jul/2026") */
-  format?: (value: string) => string;
+  /** chave de formatação opcional (ver FORMATTERS e [FIX 2026-09-15] acima)
+   * — nunca uma função direta, isso é o que quebrava as 4 páginas */
+  format?: keyof typeof FORMATTERS;
 }
 
 export function FilterBar({ dimensions }: { dimensions: FilterDimension[] }) {
@@ -152,7 +178,7 @@ function MultiSelect({
   }, []);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const fmt = (v: string) => (dimension.format ? dimension.format(v) : v);
+  const fmt = (v: string) => (dimension.format ? FORMATTERS[dimension.format](v) : v);
 
   const label =
     selected.length === 0
