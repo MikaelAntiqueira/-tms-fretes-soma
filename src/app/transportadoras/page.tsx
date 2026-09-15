@@ -8,7 +8,7 @@ import { TransportadorasTabs } from "./TransportadorasTabs";
 import { PrecoPrazoChart, type PrazoMedioRow } from "./PrecoPrazoChart";
 import { RegiaoComercialChart, type RegiaoComercialRow } from "./RegiaoComercialChart";
 import { ClientesChart, type ClienteMetricaRow } from "./ClientesChart";
-import { fmtMes, parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedio, clsDifSobreFrete, confiabilidade } from "@/lib/format";
+import { parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedio, clsDifSobreFrete, confiabilidade } from "@/lib/format";
 
 // Página "Transportadoras & Cidades" — sub-abas "Comparativo" (TASK-29
 // continuação, 2026-09-11, inalterada nesta etapa), "Preço × Prazo",
@@ -395,7 +395,7 @@ export default async function TransportadorasPage({
                     param: "mes",
                     labelAll: "Todos os meses",
                     options: opcoesMeses,
-                    format: fmtMes,
+                    format: "mes",
                   },
                   {
                     param: "transportadora",
