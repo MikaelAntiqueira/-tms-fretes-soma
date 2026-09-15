@@ -3,7 +3,7 @@ import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Suspense } from "react";
 import { OportunidadesTabsClient } from "./OportunidadesTabsClient";
-import { fmtMes, parseMulti, clsDifSobreFrete, fmtBRL, fmtNum, fmtPct } from "@/lib/format";
+import { parseMulti, clsDifSobreFrete, fmtBRL, fmtNum, fmtPct } from "@/lib/format";
 
 // Página "Oportunidades" — sub-abas:
 //   1. Classificação  (🔴🟠🔵🟢⚠️ — tabela + KPIs)
@@ -271,7 +271,7 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
   const opcoesRegioes = [...new Set(rows.map((r) => r.regiao_normalizada))].sort();
 
   const filterDimensions: FilterDimension[] = [
-    { param: "mes", labelAll: "Todos os meses", options: opcoesMes, format: fmtMes },
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMes, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: ["Público", "Privado", "Grupo"] },
