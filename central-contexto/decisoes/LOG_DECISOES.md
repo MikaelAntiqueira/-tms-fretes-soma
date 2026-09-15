@@ -342,3 +342,46 @@ gate de página falhasse.
 
 **Não verificado**: mesma limitação de sempre — sem acesso ao painel da Vercel, não dá pra
 confirmar 100% em produção sem o Mikael testar depois do próximo deploy.
+
+## D-29 — CAUSA RAIZ REAL do "This page couldn't load": build quebrado por env var faltando, não bug da Vercel
+
+**Decisão**: Mikael conseguiu me dar acesso ao painel da Vercel (via print, já que o conector MCP
+não enxergava o projeto certo). Isso revelou a causa raiz de verdade, bem diferente de [D-27]/[D-28]:
+o deployment mais recente do projeto **"tms-fretes-soma-app"** estava com status **Build Failed**
+("No Production Deployment — Your Production Domain is not serving traffic") há ~3h, com o erro
+`Error: Faltam as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY`
+ocorrendo ao pré-renderizar `/_not-found`.
+
+**Causa exata**: `src/lib/supabase-browser.ts` fazia a checagem de env var e o `throw` no ESCOPO
+DO MÓDULO (topo do arquivo, fora de qualquer função) — padrão comum, mas perigoso aqui porque
+`SessionIndicator` (que importa esse arquivo) é renderizado dentro de `DashboardShell`, presente
+no LAYOUT RAIZ — ou seja, em TODA página, inclusive a `/_not-found` que o Next.js gera e
+pré-renderiza automaticamente durante o build. Resultado: se as env vars não estiverem
+configuradas no ambiente de build da Vercel (Project Settings → Environment Variables), o build
+INTEIRO falha — não só as páginas que de fato precisam do Supabase. `src/lib/supabase.ts` (cliente
+antigo, já confirmado sem nenhum importador) tinha o mesmo padrão frágil.
+
+**Corrigido**: a checagem foi movida pra dentro do corpo de `createSupabaseBrowserClient()` — só
+lança erro quando alguém de fato chama a função (em runtime, no navegador), nunca durante o
+build/prerender. `src/lib/supabase.ts` (morto, mesmo padrão frágil) foi deletado. Validado: build
+local rodou limpo tanto SEM nenhuma env var setada (reproduzindo exatamente a condição de falha)
+quanto COM as env vars reais — nenhuma regressão.
+
+**Pendente, fora do meu alcance**: as env vars (`NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`) continuam PRECISANDO ser configuradas no projeto Vercel
+("tms-fretes-soma-app", Project Settings → Environment Variables, nos 3 ambientes — Production,
+Preview, Development) pra a aplicação funcionar de verdade em runtime — este fix só evita que a
+ausência delas derrube o BUILD inteiro; não substitui configurá-las. Não tenho ferramenta de
+escrita nas configurações da Vercel (só leitura, e mesmo essa com acesso limitado via MCP —
+`list_projects`/`list_teams` não enxergavam esse projeto). Também vale confirmar com o Mikael se
+"tms-fretes-soma-app" e o domínio original "tms-fretes-soma.vercel.app" testado antes são o MESMO
+projeto ou dois projetos Vercel diferentes conectados ao mesmo repositório GitHub — isso explicaria
+por que alguns testes de hoje mostravam sucesso (provavelmente um projeto com env vars corretas)
+e outros mostravam a tela de erro (o outro projeto, sem env vars, buildando quebrado).
+
+**Retrospectiva sobre [D-26]/[D-27]/[D-28]**: aquelas investigações não estavam erradas sobre os
+sintomas que encontraram (timeout real em `/operacao`, bug documentado da Vercel com
+middleware/proxy) — mas nenhuma delas era a causa do que o Mikael via na tela hoje à noite. Sem
+acesso ao painel/log de build da Vercel, não tinha como diferenciar "bug intermitente de
+plataforma" de "build quebrado 100% determinístico" — os dois produzem a mesma tela genérica
+"This page couldn't load" pro usuário final.
