@@ -122,3 +122,29 @@ export function confiabilidade(n: number): { label: string; pillClass: string | 
   if (n >= 30) return { label: "⚠️ amostra pequena", pillClass: "pill laranja" };
   return { label: "⚠️ insuficiente para conclusão", pillClass: "pill n" };
 }
+
+// [FIX 2026-09-15, D-30] As duas funções abaixo (fmtEscolheuLabel,
+// fmtPrazoDiasLabel) foram extraídas de dentro de src/app/financeiro/
+// page.tsx, onde existiam como funções INLINE passadas via prop `format`
+// de <FilterBar> (Server Component → Client Component). React Server
+// Components não permite serializar uma função comum através dessa
+// fronteira — só Server Actions ("use server") — e isso derrubava
+// /financeiro (e, pelo mesmo padrão com `fmtMes`, também /operacao,
+// /transportadoras e /oportunidades) com a tela genérica "This page
+// couldn't load" da Vercel. Ver o comentário completo em
+// src/components/FilterBar.tsx, onde `FORMATTERS` agora resolve a chave
+// string ("mes"/"esc"/"prazo") para a função real, DENTRO do próprio
+// Client Component — nenhuma função cruza o boundary servidor→cliente.
+
+/** Rótulo de "escolheu a mais barata" (S/N/SC) para o dropdown de filtro —
+ * mesmos 3 valores de EscPill acima, chave "esc" em FilterBar.FORMATTERS */
+export function fmtEscolheuLabel(v: string): string {
+  const labels: Record<string, string> = { S: "Sim", N: "Não", SC: "Sem comparação" };
+  return labels[v] ?? v;
+}
+
+/** Pluraliza prazo em dias ("1" -> "1 dia", "2" -> "2 dias") para o
+ * dropdown de filtro — chave "prazo" em FilterBar.FORMATTERS */
+export function fmtPrazoDiasLabel(v: string): string {
+  return `${v} dia${v === "1" ? "" : "s"}`;
+}
