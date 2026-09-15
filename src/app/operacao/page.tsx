@@ -291,7 +291,7 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
   return { kpis, carriers, janelas, janelaCarriers, cidades, opcoesMeses, opcoesRegioes, opcoesTipos };
 }
 
-import { fmtBRL, fmtBRLSigned, fmtNum, fmtPct, fmtMes, parseMulti, clsDifSobreFrete } from "@/lib/format";
+import { fmtBRL, fmtBRLSigned, fmtNum, fmtPct, parseMulti, clsDifSobreFrete } from "@/lib/format";
 
 // Classifica a magnitude da diferença sobre o frete DA PRÓPRIA LINHA (não
 // sobre a menor cotação, como em /ontem) — regra exata do Artifact de
@@ -337,7 +337,7 @@ export default async function OperacaoPage({
   const opcoesTipos = data?.opcoesTipos ?? [];
 
   const filterDimensions: FilterDimension[] = [
-    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: fmtMes },
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
