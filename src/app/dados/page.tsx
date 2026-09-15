@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref } from "@/lib/format";
 
@@ -124,6 +124,9 @@ const COLUMNS: { key: SortColumn | null; label: string; num?: boolean }[] = [
 type DadosSearchParams = Record<string, string | string[] | undefined>;
 
 export default async function DadosPage({ searchParams }: { searchParams: Promise<DadosSearchParams> }) {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/dados");
   const sp = await searchParams;
   const q = parseQ(sp.q);
   const sort = parseSort(sp.sort);

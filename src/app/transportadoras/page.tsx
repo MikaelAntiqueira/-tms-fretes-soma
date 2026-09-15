@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ComparativoCharts } from "./ComparativoCharts";
@@ -306,6 +306,9 @@ export default async function TransportadorasPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/transportadoras");
   const sp = await searchParams;
   const filtros: FiltrosTransp = {
     meses: parseMulti(sp.mes),

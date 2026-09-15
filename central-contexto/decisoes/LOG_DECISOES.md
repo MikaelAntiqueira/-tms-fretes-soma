@@ -313,3 +313,32 @@ anterior, [D-26], ele confirmou que ainda dava erro). Próxima sessão: pergunta
 "This page couldn't load" parou de aparecer; se persistir, o próximo suspeito é o mesmo bug em
 outra função (nem toda função tem o mesmo padrão de import) — pode precisar também de
 `serverExternalPackages` ou abrir um ticket com o suporte da Vercel citando os issues acima.
+## D-28 — Guarda de autenticação por página, independente do proxy.ts (rede de segurança pro bug [D-27])
+
+**Decisão**: confirmado com print do Mikael (mobile, 20:54) que o erro "This page couldn't load"
+continuava acontecendo em `/operacao` e `/oportunidades` MESMO depois do fix de [D-27]
+(`outputFileTracingIncludes` no `next.config.ts`) já estar publicado. Conferido nos logs do
+Supabase: **zero tráfego do app** (`node`) entre 20:52-20:56 — a requisição nunca chegou a
+consultar o banco, confirmando de novo que a falha acontece antes de qualquer código nosso rodar,
+na função separada de middleware/proxy da Vercel.
+
+Como não dá pra garantir que o fix do `@vercel/nft` elimina 100% da intermitência (é um bug da
+própria Vercel, fora do nosso controle), adicionei uma segunda camada, independente: cada uma das
+7 páginas protegidas (`/`, `/dados`, `/financeiro`, `/ontem`, `/operacao`, `/oportunidades`,
+`/transportadoras`) agora chama `requireUser()` (novo helper em `supabase-server.ts`) como
+primeira linha do Server Component, antes de buscar qualquer dado. Isso roda dentro da função
+normal da PÁGINA — não da função separada de middleware — então não é afetado pelo mesmo bug de
+empacotamento do `proxy.ts`. Testado localmente com `proxy.ts` completamente removido: as 3
+páginas testadas (`/`, `/operacao`, `/oportunidades`) redirecionam corretamente para
+`/login?redirect=...` sem sessão, sem quebrar.
+
+**Motivo**: `proxy.ts` continua no lugar (não é redundante removê-lo — ele também cuida do
+redirecionamento de quem já está logado tentando abrir `/login`), mas agora, se a Lambda de
+middleware falhar de novo por esse bug da Vercel, o pior caso deixa de ser "tela de erro genérica
+pra todo mundo" e passa a ser "página carrega normalmente, sem gate de login" só nessa invocação
+específica — ainda não ideal, mas MUITO menos grave que o app inteiro ficar instável, e a proteção
+de dado real continua garantida pela RLS (`authenticated`-only) de qualquer forma, mesmo se o
+gate de página falhasse.
+
+**Não verificado**: mesma limitação de sempre — sem acesso ao painel da Vercel, não dá pra
+confirmar 100% em produção sem o Mikael testar depois do próximo deploy.

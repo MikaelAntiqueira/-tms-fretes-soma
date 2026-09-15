@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { fmtNum, fmtBRL2 } from "@/lib/format";
 
@@ -49,6 +49,9 @@ async function getKpis(): Promise<Kpis> {
 
 
 export default async function Home() {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/");
   let kpis: Kpis | null = null;
   let erro: string | null = null;
 

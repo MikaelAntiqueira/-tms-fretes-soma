@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Suspense } from "react";
@@ -195,6 +195,9 @@ interface PageProps {
 }
 
 export default async function OportunidadesPage({ searchParams }: PageProps) {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/oportunidades");
   const sp = await searchParams;
   const filtros = {
     meses:        parseMulti(sp.mes),

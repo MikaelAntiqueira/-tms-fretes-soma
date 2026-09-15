@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 
@@ -307,6 +307,9 @@ export default async function OperacaoPage({
 }: {
   searchParams: Promise<OperacaoSearchParams>;
 }) {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/operacao");
   const sp = await searchParams;
   const filtros: FiltrosOperacao = {
     meses: parseMulti(sp.mes),

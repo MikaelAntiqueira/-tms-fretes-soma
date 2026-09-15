@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { FinanceiroTabs } from "./FinanceiroTabs";
@@ -604,6 +604,9 @@ export default async function FinanceiroPage({
 }: {
   searchParams: Promise<FinanceiroSearchParams>;
 }) {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/financeiro");
   const sp = await searchParams;
   const prazosParam = parseMulti(sp.prazo);
   const filtros: FiltrosVisaoGeral = {

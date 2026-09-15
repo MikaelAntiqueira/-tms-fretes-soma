@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
@@ -564,6 +564,9 @@ function RadarCardView({ c }: { c: RadarCardData }) {
 }
 
 export default async function OntemPage() {
+  // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
+  // src/lib/supabase-server.ts.
+  await requireUser("/ontem");
   let data: OntemData | null = null;
   let erro: string | null = null;
   try {
