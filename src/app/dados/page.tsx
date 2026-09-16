@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref } from "@/lib/format";
+import { FilterBar, type FilterDimension } from "@/components/FilterBar";
+import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref, parseMulti } from "@/lib/format";
 
 // Página "Dados" (rodapé do Artifact original, c0abf79e-... v42) — a única
 // das 10 tabelas do Artifact com busca + paginação reais (`tblDetalhe`).
@@ -24,6 +26,25 @@ import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref } from "@/li
 // não existe em nenhuma tabela do schema atual (conferido: cotacoes,
 // contratacoes, ofertas, clientes não têm esse campo). Por [R-DADO] a
 // coluna fica de fora — não é preenchida com valor inventado.
+//
+// [TASK] MOTOR DE FILTRO GLOBAL — /dados ganha as 11 dimensões (mesmo padrão
+// de /financeiro Visão Geral): migration `fn_dados_detalhe_add_filtro_
+// global_11_dimensoes` estendeu `dados_detalhe` com os 11 parâmetros
+// opcionais (default null), filtrando via `v_cotacao_filtros` ANTES da parte
+// dinâmica da function (nunca embutindo os arrays como literal dentro do
+// format()/execute já existente — evita reabrir superfície de SQL
+// injection). Reaproveita `financeiro_filtro_opcoes_cascata` (já existe) para
+// as 11 listas de opção dos dropdowns — nenhuma RPC nova de opções.
+// Regressão validada direto no Supabase: sem filtro, total_count = 5.194
+// (mesmo número de sempre); com mes='2026-08', total_count = 1.558, idêntico
+// a `select count(*) from v_ontem_comparacao where cotacao_id in (select
+// cotacao_id from v_cotacao_filtros where mes='2026-08')` feito à parte.
+//
+// Como esta página já usa a URL para busca/ordenação/paginação (`?q=/?sort=/
+// ?dir=/?page=`), os filtros entram nos MESMOS search params
+// (`?mes=/?transportadora=/...`) — `buildHref` (lib/format.tsx) agora aceita
+// um `extra` pra repassar os filtros ativos nos links de cabeçalho de coluna
+// e paginação, senão eles apagariam o filtro ao trocar de página/ordenação.
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
@@ -68,7 +89,45 @@ function parseQ(v: string | string[] | undefined): string {
   return (s ?? "").trim();
 }
 
-async function getDadosDetalhe(opts: { q: string; sort: SortColumn; dir: "asc" | "desc"; page: number }) {
+// Filtros do motor de filtro global — mesma convenção de
+// src/app/financeiro/page.tsx (`null` numa dimensão = sem filtro nela).
+interface FiltrosDados {
+  meses: string[] | null;
+  transportadoras: string[] | null;
+  regioes: string[] | null;
+  tipos: string[] | null;
+  romaneios: string[] | null;
+  esc: string[] | null;
+  prazos: number[] | null;
+  cidades: string[] | null;
+  janelas: string[] | null;
+  faixasPeso: string[] | null;
+  faixasCubagem: string[] | null;
+}
+
+function filtroArgsOf(filtros: FiltrosDados) {
+  return {
+    p_meses: filtros.meses,
+    p_transportadoras: filtros.transportadoras,
+    p_regioes: filtros.regioes,
+    p_tipos: filtros.tipos,
+    p_romaneios: filtros.romaneios,
+    p_esc: filtros.esc,
+    p_prazos: filtros.prazos,
+    p_cidades: filtros.cidades,
+    p_janelas: filtros.janelas,
+    p_faixas_peso: filtros.faixasPeso,
+    p_faixas_cubagem: filtros.faixasCubagem,
+  };
+}
+
+async function getDadosDetalhe(opts: {
+  q: string;
+  sort: SortColumn;
+  dir: "asc" | "desc";
+  page: number;
+  filtros: FiltrosDados;
+}) {
   const supabase = await createSupabaseServerClient();
   const offset = (opts.page - 1) * PAGE_SIZE;
   const res = await supabase.rpc("dados_detalhe", {
@@ -77,6 +136,7 @@ async function getDadosDetalhe(opts: { q: string; sort: SortColumn; dir: "asc" |
     p_dir: opts.dir,
     p_limit: PAGE_SIZE,
     p_offset: offset,
+    ...filtroArgsOf(opts.filtros),
   });
   if (res.error) throw new Error(res.error.message);
   const rows = ((res.data as Record<string, unknown>[]) ?? []).map(
@@ -132,17 +192,90 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
   const sort = parseSort(sp.sort);
   const dir = parseDir(sp.dir);
   const page = parsePage(sp.page);
+  const prazosParam = parseMulti(sp.prazo);
+  const filtros: FiltrosDados = {
+    meses: parseMulti(sp.mes),
+    transportadoras: parseMulti(sp.transportadora),
+    regioes: parseMulti(sp.regiao),
+    tipos: parseMulti(sp.tipo),
+    romaneios: parseMulti(sp.romaneio),
+    esc: parseMulti(sp.esc),
+    prazos: prazosParam ? prazosParam.map(Number) : null,
+    cidades: parseMulti(sp.cidade),
+    janelas: parseMulti(sp.janela),
+    faixasPeso: parseMulti(sp.faixaPeso),
+    faixasCubagem: parseMulti(sp.faixaCubagem),
+  };
+  // Repassado para buildHref (cabeçalhos de coluna e paginação) pra não
+  // apagar o filtro ativo ao trocar de página/ordenação.
+  const extraFiltroParams: Record<string, string | undefined> = {
+    mes: sp.mes as string | undefined,
+    transportadora: sp.transportadora as string | undefined,
+    regiao: sp.regiao as string | undefined,
+    tipo: sp.tipo as string | undefined,
+    romaneio: sp.romaneio as string | undefined,
+    esc: sp.esc as string | undefined,
+    prazo: sp.prazo as string | undefined,
+    cidade: sp.cidade as string | undefined,
+    janela: sp.janela as string | undefined,
+    faixaPeso: sp.faixaPeso as string | undefined,
+    faixaCubagem: sp.faixaCubagem as string | undefined,
+  };
 
   let rows: DadosRow[] = [];
   let totalCount = 0;
+  let opcoesMeses: string[] = [];
+  let opcoesTransportadoras: string[] = [];
+  let opcoesRegioes: string[] = [];
+  let opcoesTipos: string[] = [];
+  let opcoesRomaneios: string[] = [];
+  let opcoesEsc: string[] = [];
+  let opcoesPrazos: number[] = [];
+  let opcoesCidades: string[] = [];
+  let opcoesJanelas: string[] = [];
+  let opcoesFaixasPeso: string[] = [];
+  let opcoesFaixasCubagem: string[] = [];
   let erro: string | null = null;
   try {
-    const res = await getDadosDetalhe({ q, sort, dir, page });
-    rows = res.rows;
-    totalCount = res.totalCount;
+    const supabase = await createSupabaseServerClient();
+    const [dataRes, opcoesRes] = await Promise.all([
+      getDadosDetalhe({ q, sort, dir, page, filtros }),
+      // Mesma RPC de cascata já usada em /financeiro — nenhuma function nova
+      // de opções, só reaproveitada com os mesmos 11 argumentos.
+      supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgsOf(filtros)),
+    ]);
+    if (opcoesRes.error) throw new Error(opcoesRes.error.message);
+    rows = dataRes.rows;
+    totalCount = dataRes.totalCount;
+    const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+    opcoesMeses = (opcoesRow?.meses as string[] | null) ?? [];
+    opcoesTransportadoras = (opcoesRow?.transportadoras as string[] | null) ?? [];
+    opcoesRegioes = (opcoesRow?.regioes as string[] | null) ?? [];
+    opcoesTipos = (opcoesRow?.tipos as string[] | null) ?? [];
+    opcoesRomaneios = (opcoesRow?.romaneios as string[] | null) ?? [];
+    opcoesEsc = (opcoesRow?.escs as string[] | null) ?? [];
+    opcoesPrazos = ((opcoesRow?.prazos as string[] | null) ?? []).map(Number);
+    opcoesCidades = (opcoesRow?.cidades as string[] | null) ?? [];
+    opcoesJanelas = (opcoesRow?.janelas as string[] | null) ?? [];
+    opcoesFaixasPeso = (opcoesRow?.faixas_peso as string[] | null) ?? [];
+    opcoesFaixasCubagem = (opcoesRow?.faixas_cubagem as string[] | null) ?? [];
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
+
+  const filterDimensions: FilterDimension[] = [
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: "mes" },
+    { param: "transportadora", labelAll: "Todas as transportadoras", options: opcoesTransportadoras },
+    { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
+    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+    { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: "esc" },
+    { param: "prazo", labelAll: "Todos os prazos", options: opcoesPrazos.map(String), format: "prazo" },
+    { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
+    { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelas },
+    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: opcoesFaixasPeso },
+    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: opcoesFaixasCubagem },
+  ];
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -157,7 +290,10 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
             <p>
               Tabela detalhada, 1 linha por processo de cotação — busca por cliente, pedido, NF ou
               romaneio, ordenação por coluna, paginação server-side (a mesma tabela "Dados"
-              do Artifact atual, agora lendo direto do Supabase).
+              do Artifact atual, agora lendo direto do Supabase). Já aceita as 11 dimensões do
+              motor de filtro global (Mês, Transportadora Contratada, Região Comercial, Tipo
+              Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de Peso,
+              Faixa de Cubagem).
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
@@ -175,6 +311,9 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
           </div>
         ) : (
           <section className="bloc" style={{ marginTop: 0 }}>
+            <Suspense fallback={<div className="filterbar" />}>
+              <FilterBar dimensions={filterDimensions} />
+            </Suspense>
             <div className="bloc-head" style={{ alignItems: "center", justifyContent: "space-between" }}>
               <div className="desc" id="tblCount">
                 {totalCount.toLocaleString("pt-BR")} processos {q ? `encontrados para "${q}"` : "no total"}
@@ -182,6 +321,9 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
               <form action="/dados" method="get" style={{ display: "flex", gap: 8 }}>
                 <input type="hidden" name="sort" value={sort} />
                 <input type="hidden" name="dir" value={dir} />
+                {Object.entries(extraFiltroParams).map(([k, v]) =>
+                  v ? <input key={k} type="hidden" name={k} value={v} /> : null
+                )}
                 <input
                   type="search"
                   name="q"
@@ -218,7 +360,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
                       const nextDir: "asc" | "desc" = isActive && dir === "desc" ? "asc" : "desc";
                       return (
                         <th key={c.label} className={c.num ? "num" : undefined}>
-                          <Link href={buildHref({ q, sort: c.key, dir: nextDir, page: 1 })}>
+                          <Link href={buildHref({ q, sort: c.key, dir: nextDir, page: 1 }, extraFiltroParams)}>
                             {c.label}
                             {isActive ? (dir === "asc" ? " ▲" : " ▼") : ""}
                           </Link>
@@ -271,7 +413,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
 
             <div id="pager" style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
               {currentPage > 1 ? (
-                <Link href={buildHref({ q, sort, dir, page: currentPage - 1 })} className="tab-btn">
+                <Link href={buildHref({ q, sort, dir, page: currentPage - 1 }, extraFiltroParams)} className="tab-btn">
                   ‹ Anterior
                 </Link>
               ) : (
@@ -281,7 +423,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
                 Página {currentPage} de {totalPages}
               </span>
               {currentPage < totalPages ? (
-                <Link href={buildHref({ q, sort, dir, page: currentPage + 1 })} className="tab-btn">
+                <Link href={buildHref({ q, sort, dir, page: currentPage + 1 }, extraFiltroParams)} className="tab-btn">
                   Próxima ›
                 </Link>
               ) : (

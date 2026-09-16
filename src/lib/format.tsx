@@ -72,13 +72,24 @@ export function fmtKg(v: number | null | undefined): string {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
 }
 
-/** Monta href de paginação para /dados */
-export function buildHref(base: { q: string; sort: string; dir: "asc" | "desc"; page: number }): string {
+/** Monta href de paginação para /dados — `extra` repassa os parâmetros do
+ * motor de filtro global (?mes=/?transportadora=/... ) que já estavam na
+ * URL, senão um clique num cabeçalho de coluna ou na paginação apagaria
+ * silenciosamente o filtro ativo. */
+export function buildHref(
+  base: { q: string; sort: string; dir: "asc" | "desc"; page: number },
+  extra?: Record<string, string | undefined>
+): string {
   const params = new URLSearchParams();
   if (base.q) params.set("q", base.q);
   params.set("sort", base.sort);
   params.set("dir", base.dir);
   params.set("page", String(base.page));
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) {
+      if (v) params.set(k, v);
+    }
+  }
   return `/dados?${params.toString()}`;
 }
 
