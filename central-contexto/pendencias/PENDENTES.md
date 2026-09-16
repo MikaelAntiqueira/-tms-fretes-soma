@@ -96,7 +96,24 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       subqueries — deu timeout na primeira versão).
 
 ### A fazer agora
-- [ ] Fazer outras páginas reagirem ao filtro (além de /financeiro Visão Geral)
+- [x] ~~Fazer outras páginas reagirem ao filtro~~ — **`/dados` portado 2026-09-16** (commit
+      `ae8d0c4`, migration `fn_dados_detalhe_add_filtro_global_11_dimensoes`): `dados_detalhe`
+      ganhou os 11 parâmetros opcionais, mesmo padrão de `v_cotacao_filtros` já usado em
+      /operacao e /transportadoras; opções dos dropdowns reaproveitam `financeiro_filtro_opcoes_
+      cascata` (nenhuma RPC nova). Regressão validada direto no Supabase: sem filtro,
+      total_count = 5.194 (baseline); com `mes=2026-08`, total_count = 1.558 = contagem
+      cruzada feita à parte. **Ainda faltam** `/` (Visão Geral/home — mas é só uma página de
+      prova de conceito, candidata a ser descontinuada, não um dos 5 painéis do dashboard
+      original) e `/ontem` (day-scoped — decidir antes se faz sentido produto filtrar por
+      mês/transportadora/região/tipo um recorte que já é só o último dia, ou se as 11 dimensões
+      não se aplicam aqui).
+      **Não confirmado ainda**: não há como testar em produção com sessão autenticada sem
+      logar como o Mikael (ação que a sessão que implementou não pode executar) — falta ele
+      abrir `/dados`, aplicar um filtro (ex. um mês) e confirmar que a página carrega normalmente
+      e a tabela/paginação/ordenação reagem, sem repetir o "This page couldn't load" que já
+      aconteceu 4x nesta mesma área (ver [D-30] em FilterBar.tsx — causa era `format` como
+      função cruzando a fronteira Server→Client Component; esta rodada usa só chaves string,
+      igual ao fix documentado).
 - [ ] Validar as 11 dimensões campo a campo contra o Artifact original (só as 4 da Fase 1 foram
       validadas por Playwright até agora)
 
