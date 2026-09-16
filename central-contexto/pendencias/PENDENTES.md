@@ -392,7 +392,24 @@ não fiz agora porque é uma mudança de arquitetura maior, não algo pra decidi
       estima" preservada; validado com Leomar filtrada (394 processos, R$37.011,91 real) — São
       Miguel/Santa Cruz mais baratas com boa cobertura, Fritz/Rede Nacional cobertura baixa
       (só competem na janela Meio-dia), consistente com o caso já conhecido [DEC-22].
-- [ ] Área administrativa de importação de arquivos (usar policy nova de importacoes)
+- [x] ~~Área administrativa de importação de arquivos~~ — **feito 2026-09-16** (commit
+      `890cff9`). Achado ao investigar: nenhum dado entra no banco desde a carga histórica
+      única de 11/09 (todas as linhas com o mesmo `inserido_em`, numa janela de segundos) —
+      nunca houve atualização desde então. Nova página `/importar` (só `role='admin'`, via
+      `requireAdmin()`) recebe upload de `cotacoes_reais.json`/`contratados_reais.json`/
+      `cnpj_to_info.json` (os 3 arquivos que `ATUALIZAR AUTOMATICO.bat` já gera em `codigo/`,
+      nenhum passo extra do Mikael) e recarrega cotações/ofertas/contratações/clientes/
+      transportadoras. `src/lib/importacao.ts` é porta fiel de `codigo/load_to_supabase.py`
+      (script que já fez a carga original) — validado rodando a versão TS contra os dados
+      reais: todos os totais e a soma de frete contratado cruzado (R$ 494.417,43) batem
+      exatos com a versão Python. RPCs novas `importar_iniciar/importar_lote_*/
+      importar_finalizar` (SECURITY DEFINER, migrations `fn_importar_carga_completa` +
+      `fix_importar_transportadoras_upsert_por_nome`), chamadas em lotes paralelos direto do
+      navegador (arquivos somam ~23MB, além do limite de corpo de requisição de uma function
+      da Vercel). Ponte deliberadamente simples/temporária — Mikael confirmou que isso só
+      existe até surgir uma fonte de dados melhor (API do TMS/ERP), não é arquitetura final.
+      **Não confirmado ainda**: falta o Mikael testar de fato (subir os 3 arquivos e ver os
+      totais baterem na tela) — não há como logar como ele pra testar isso no navegador.
 
 ## Auth e segurança — RESOLVIDO 2026-09-14 (doc estava desatualizada, corrigida agora)
 
@@ -414,8 +431,10 @@ não fiz agora porque é uma mudança de arquitetura maior, não algo pra decidi
 - [x] `v_cotacao_filtros` — achado à parte (não relacionado ao middleware): faltava
       `security_invoker=true`, bypassando RLS nesse endpoint específico mesmo com o resto
       correto. Corrigido 2026-09-14, ver [D-23] em LOG_DECISOES.md.
-- [ ] Proteger páginas administrativas — ainda não se aplica: a área administrativa de
-      importação de arquivos (abaixo, em "Funcionalidades") não existe como rota ainda.
+- [x] ~~Proteger páginas administrativas~~ — **feito 2026-09-16**: `requireAdmin()` (nova, em
+      `supabase-server.ts`) estende `requireUser()` exigindo `profiles.role='admin'` (D-12),
+      redirecionando pra `/` quem está logado mas não é admin. Usada pela página `/importar`
+      (ver "Área administrativa de importação" abaixo).
 
 ## Melhorias de qualidade
 
