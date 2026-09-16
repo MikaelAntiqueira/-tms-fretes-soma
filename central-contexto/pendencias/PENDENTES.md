@@ -102,11 +102,9 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       /operacao e /transportadoras; opções dos dropdowns reaproveitam `financeiro_filtro_opcoes_
       cascata` (nenhuma RPC nova). Regressão validada direto no Supabase: sem filtro,
       total_count = 5.194 (baseline); com `mes=2026-08`, total_count = 1.558 = contagem
-      cruzada feita à parte. **Ainda faltam** `/` (Visão Geral/home — mas é só uma página de
+      cruzada feita à parte. **Ainda falta** `/` (Visão Geral/home — mas é só uma página de
       prova de conceito, candidata a ser descontinuada, não um dos 5 painéis do dashboard
-      original) e `/ontem` (day-scoped — decidir antes se faz sentido produto filtrar por
-      mês/transportadora/região/tipo um recorte que já é só o último dia, ou se as 11 dimensões
-      não se aplicam aqui).
+      original — decisão do Mikael antes de investir nisso).
       **Não confirmado ainda**: não há como testar em produção com sessão autenticada sem
       logar como o Mikael (ação que a sessão que implementou não pode executar) — falta ele
       abrir `/dados`, aplicar um filtro (ex. um mês) e confirmar que a página carrega normalmente
@@ -114,6 +112,19 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       aconteceu 4x nesta mesma área (ver [D-30] em FilterBar.tsx — causa era `format` como
       função cruzando a fronteira Server→Client Component; esta rodada usa só chaves string,
       igual ao fix documentado).
+- [x] ~~`/ontem` — seletor de dia específico~~ — **portado 2026-09-16** (commit `1aff130`,
+      migration `fn_ontem_dias_disponiveis`). Mikael esclareceu que `/ontem` NÃO precisa do
+      motor de filtro global de 11 dimensões (é um recorte de 1 dia só, filtrar por mês não faz
+      sentido) — o que fazia falta era poder escolher OUTRO dia específico além do padrão
+      (último dia com contratação cruzada). Nova RPC `ontem_dias_disponiveis()` lista os 100
+      dias com dado (2026-01-02 a 2026-08-27); `?dia=AAAA-MM-DD` na URL escolhe o dia, ignorado
+      silenciosamente se inválido/sem dado (cai no padrão). Componente novo `DiaSelector.tsx`
+      segue a mesma convenção do FilterBar (nenhuma função cruza a fronteira Server→Client).
+      Validado direto no Supabase com um dia arbitrário do meio da série (2026-07-16):
+      ontem_kpis/ontem_contratacoes/radar_d2/d3/d4/d6 todos retornam dados consistentes.
+      **Não confirmado ainda** (mesma limitação do item acima — sem sessão autenticada pra
+      testar no navegador): falta o Mikael abrir `/ontem`, trocar o dia no seletor e confirmar
+      visualmente que os KPIs/Radar/tabela mudam e a página não quebra.
 - [ ] Validar as 11 dimensões campo a campo contra o Artifact original (só as 4 da Fase 1 foram
       validadas por Playwright até agora)
 
