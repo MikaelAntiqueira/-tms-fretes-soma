@@ -275,15 +275,80 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       peso na tabela de cubagem também afetam este gráfico. Formato/ordem dos 8 buckets e a
       tendência (n caindo, frete_medio subindo por faixa) continuam corretos — só a MAGNITUDE
       dos números mudou, coerente com dado que mudou entre 11/09 e hoje, não lógica errada.
-      **Ainda faltam 5 gráficos**: `chartUf`/`chartClientes` (`transportadoras_regiao_
-      comercial`/`clientes_metricas`), `chartQuadrante` (`transportadoras_prazo_medio`),
-      `chartClassif` (contagens da view `comparacoes`), `chartClassif`'s underlying `comparacoes`
-      counts. E as tabelas: `ontTabela`, `tblPrazoHist`/`tblTransp`/`tblCidades`,
-      `tblOportunidades`, `opQuem`/`opCidades` (inventário completo nas seções acima).
-      **Pra continuar à tarde**: reabrir `http://127.0.0.1:8791/artifact-v40-2026-09-11.html`
-      (servir com `python -m http.server 8791` dentro de `dashboard-restore-points/`), navegar
-      pra `/transportadoras` (todas as 5 sub-abas, pra instanciar os canvases que faltam) e
-      `/oportunidades`, e repetir `Chart.instances` via `javascript_tool`.
+      **Os 5 gráficos restantes foram validados na sequência (mesmo dia, 2026-09-16)** —
+      `chartUf`/`chartClientes` (`transportadoras_regiao_comercial`/`clientes_metricas`) e
+      `chartQuadrante` (`transportadoras_prazo_medio` + `comparativo`) bateram exatos, dígito a
+      dígito, nas 15/12/7 linhas checadas. `chartClassif` achou um **bug real** — ver seção
+      "CORRIGIDO — bug de acento" abaixo. **16 de 16 gráficos agora validados.**
+
+      **10 de 10 tabelas também validadas, mesmo dia**: `tblTransp` (Comparativo, 7
+      transportadoras × 8 colunas, tudo exato), `tblPrazoHist` (7 transportadoras, só 1 célula
+      com drift de dado esperado — N de Rede Nacional 54→55), `tblCidades` (top 10 linhas,
+      tudo exato), `ontTabela` (KPIs do dia 27/08 + top 3 linhas da tabela de contratações,
+      tudo exato), `tblOportunidades` (Clientes Prioritários, top 3 clientes por diferença
+      acumulada, tudo exato — só depois do fix do bug de acento abaixo). `opQuem`/`opCidades`
+      bateram exatos na tabela por transportadora — **mas o KPI do topo de `/operacao` tem um
+      achado importante NÃO corrigido, ver seção própria abaixo.**
+
+      **Resumo final da rodada de validação (2026-09-16): 16/16 gráficos + 10/10 tabelas + 11/11
+      dimensões do filtro global testadas campo a campo contra o Artifact original. 3 bugs reais
+      encontrados e corrigidos** (faixa de peso do filtro/DEC-26, acento "Publico" na
+      classificação de oportunidades, feedback visual de carregamento) **+ 1 achado sério
+      documentado sem correção ainda** (KPIs do topo de /operacao, precisa de mais
+      investigação antes de tocar).
+
+## ✅ CORRIGIDO 2026-09-16 — bug de acento quebrava classificação e filtro "Tipo" em /oportunidades
+
+Validando `chartClassif` contra o Artifact: a view `comparacoes` comparava `tipo_cliente` com
+o literal `'Público'` (COM acento), mas a coluna `clientes.tipo_cliente` armazena `'Publico'`
+(SEM acento — confirmado com `select distinct tipo_cliente from clientes`). Resultado: TODO
+cliente Publico (219 dos 1.392 processos `esc='N'`) caía na classificação `'alerta'` ("sem
+critério disponível") em vez de usar os percentis do próprio grupo Publico como qualquer
+Privado. Contagem batia a assinatura exata do bug: 219 (Publico) + 2 (Grupo) + 6 (Fornecedores)
+= 227 — e o Artifact mostrava só 8 (só Grupo/vazio de verdade).
+
+**Corrigido** (migration `fix_comparacoes_classif_acento_publico`): `alerta` caiu de 227 pra 8
+(bate exato); `azul` bateu exato (268); `laranja`/`vermelho` têm só ~13 linhas de diferença
+(drift de dado esperado, mesmo padrão já visto em outras validações). Commit `23c12dc` também
+corrigiu o dropdown "Tipo" de `/oportunidades.page.tsx` (tinha o MESMO bug — array fixo
+`["Público","Privado","Grupo"]` que nunca casava com "Publico" real — agora deriva das
+próprias linhas, como mes/regiao já faziam).
+
+## ⚠️ ACHADO, NÃO CORRIGIDO 2026-09-16 — KPIs do topo de /operacao parecem contar universo errado
+
+Validando `opQuem`/`opCidades` contra o Artifact: a tabela "Quem está carregando" (por
+transportadora) bate EXATA (7 transportadoras, todas as colunas) — mas os **KPIs do topo da
+página** (Romaneios/Pedidos/Volumes/Peso real/Cubagem, antes da tabela) não batem, e a
+diferença é grande:
+
+| KPI | Banco (`operacao_dashboard_estatico().kpis`) | Artifact v40 |
+|---|---|---|
+| Romaneios | 487 | 496 |
+| Pedidos | 5.193 | 5.324 |
+| Volumes | 48.321 | **67.198** |
+| Peso real | 426.509 kg | **666.784 kg** |
+| Cubagem | 1.372,7 m³ | 2.507,0 m³ |
+| Frete Contratado | 494.417,43 | 494.417 (bate) |
+
+Lendo o JS original (`function renderOperacao`, artifact v40): os 5 primeiros KPIs somam sobre
+**TODO O RECORTE de cotações filtradas** (`for i in 0..N`, sem checar se a cotação tem
+contratação cruzada) — só o "Frete Contratado" soma condicionalmente (`if BASE.freteC[i]!=null`,
+que só existe pra cruzadas). Ou seja: o design ORIGINAL do "Controle Operacional" mistura os
+dois universos de propósito (operação = toda cotação que passou pelo processo físico; frete
+contratado = só o que tem preço fechado) — mas a migration atual (`operacao_dashboard_
+estatico()`, sobre `v_operacao_base` = só cruzadas) restringiu TUDO a cruzadas, subcontando a
+visão operacional real.
+
+**Tentativa de achar a fonte exata, sem sucesso ainda**: `select count(distinct romaneio),
+count(distinct pedido), sum(qtd_volumes), sum(peso_real_kg), sum(cubagem_m3) from cotacoes`
+bate EXATO em Volumes (67.198) e Cubagem (2.507,0), mas não em Romaneios (429≠496)/Pedidos
+(4.440≠5.324)/Peso real (519.198≠666.784) — sugere que romaneio/pedido/peso vêm de uma UNIÃO
+entre `cotacoes` e `contratacoes` (ou de um `COALESCE` tipo o já usado em `dados_detalhe`:
+`coalesce(c.pedido, ct.pedido)`), não de uma tabela isolada. Não decifrado no tempo de hoje —
+fica pra uma sessão dedicada, com mais tempo pra rastrear `codigo/build_workbook.py` (a
+construção de `_dash_base`) linha a linha antes de tocar em SQL de produção outra vez. **Não é
+uma correção pra fazer com pressa** — muda o número que mais chama atenção na página, então
+merece ter 100% de certeza da fonte antes de mudar.
 
 ## ✅ CORRIGIDO 2026-09-16 — cliques no filtro/seletor de dia pareciam "travados" (sem feedback visual)
 
