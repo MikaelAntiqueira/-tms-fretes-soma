@@ -269,12 +269,19 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
     return `${y}-${m}`;
   }))].sort();
   const opcoesRegioes = [...new Set(rows.map((r) => r.regiao_normalizada))].sort();
+  // [FIX 2026-09-16] Antes era um array fixo ["Público", "Privado", "Grupo"] (COM acento) —
+  // mas clientes.tipo_cliente armazena "Publico" (SEM acento); filtrar por "Público" nunca
+  // batia com nenhuma linha. Mesmo bug de acento existia na view `comparacoes` (classif caía
+  // em "alerta" pra todo cliente Publico — corrigido em paralelo, migration
+  // fix_comparacoes_classif_acento_publico). Agora deriva das próprias linhas, como
+  // mes/regiao acima — nunca mais diverge do valor real.
+  const opcoesTipos = [...new Set(rows.map((r) => r.tipo_cliente))].sort();
 
   const filterDimensions: FilterDimension[] = [
     { param: "mes", labelAll: "Todos os meses", options: opcoesMes, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
-    { param: "tipo", labelAll: "Todos os tipos", options: ["Público", "Privado", "Grupo"] },
+    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
   ];
 
   // Dados das abas (hidratados client-side via state)
