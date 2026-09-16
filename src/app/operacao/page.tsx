@@ -25,6 +25,28 @@ import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 // `transportadoras.frete_minimo_observado`, nunca hardcoded no TS.
 //
 // ============================================================================
+// [FIX 2026-09-16] KPIs do topo somavam só cruzadas — [D-06] pede TODA a base
+// ============================================================================
+// Achado validando contra o Artifact original (`function renderOperacao`,
+// v40): Romaneios/Pedidos/Peso real/Volumes/Cubagem somam sobre TODA a base
+// de cotações do recorte, não só as cruzadas a uma contratação — só "Frete
+// Contratado" fica restrito às cruzadas. [D-06] (já FINAL neste repo) já
+// dizia isso ("Total de Cotações"/"Total de Pedidos" contam toda a base).
+// `operacao_dashboard_estatico()` corrigido (migration `fix_operacao_kpis_
+// toda_base_nao_so_cruzadas`) pra usar `cotacoes` (com COALESCE pra pedido/
+// peso puxando da contratação vinculada quando a cotação não tem — mesmo
+// fallback do Python original, `codigo/build_workbook.py`). Validado: 4 dos
+// 5 KPIs batem exato com o Artifact (Pedidos 5.324, Peso real 666.784 kg,
+// Volumes 67.198, Cubagem 2.507,0 m³); só Romaneios fica em 429 (Artifact
+// mostra 496) — a diferença é uma heurística legada de dado
+// (`_romaneio_do_pedido()`, derivava um romaneio sintético do texto do
+// pedido) que não existe mais no schema atual (`contratacoes` não tem
+// coluna romaneio) — decisão deliberada de não replicar essa heurística.
+// `carriers`/`janela_carriers`/`cidades` (tabelas "Quem está carregando" e
+// "Cidade × Transportadora") NÃO mudaram — continuam só cruzadas, já
+// validados exatos (precisam de "menor cotação", que só existe cruzada).
+//
+// ============================================================================
 // [FIX 2026-09-14] 500 em produção — recomputo redundante de v_operacao_base
 // ============================================================================
 // Achado com prova em log: esta página disparava, num único Promise.all, 7
