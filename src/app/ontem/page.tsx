@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
+import { DiaSelector } from "@/components/DiaSelector";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
 // Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
@@ -18,6 +20,23 @@ import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, E
 // no cliente. Só o SCORING + DEDUPLICAÇÃO final do Radar (barato — dezenas
 // de candidatos no máximo) roda aqui em TypeScript, replicando literalmente
 // a lógica de `radarCards()`.
+//
+// [TASK] SELETOR DE DIA — Mikael pediu (2026-09-16): "/ontem" continua
+// mostrando por padrão o último dia com contratação cruzada
+// (`ontem_dia_referencia()`, inalterada), mas o usuário precisa poder
+// escolher outro dia específico pra ver o mesmo painel daquele dia — não é
+// o motor de filtro global (11 dimensões, FilterBar/v_cotacao_filtros) de
+// /financeiro/dados, é um seletor de DATA simples (`?dia=AAAA-MM-DD`), já
+// que "Ontem" sempre foi um recorte de UM dia, nunca um intervalo. As RPCs
+// `ontem_kpis`/`ontem_contratacoes`/`ontem_cobertura`/`radar_d2`/`d3`/`d4`/
+// `d6` já recebiam `p_dia` como parâmetro — só faltava deixar o usuário
+// escolher esse dia. Nova RPC `ontem_dias_disponiveis()` (migration
+// `fn_ontem_dias_disponiveis`) lista os dias com dado (100 dias, 2026-01-02
+// a 2026-08-27 — validado direto no Supabase) pra popular o seletor, nunca
+// deixando escolher um dia sem contratação cruzada nenhuma. `DiaSelector`
+// (componente novo) segue a mesma convenção do FilterBar (estado na URL,
+// nenhuma função cruzando a fronteira Server→Client Component — ver
+// [FIX 2026-09-15, D-30] em FilterBar.tsx).
 export const dynamic = "force-dynamic";
 
 interface OntemKpis {
@@ -134,11 +153,21 @@ interface RadarCardData {
 
 interface OntemData {
   ref: string | null;
+  diaMaisRecente: string | null;
+  diasDisponiveis: string[];
   kpis: OntemKpis | null;
   linhas: OntemLinha[];
   cobertura: OntemCobertura | null;
   radar: RadarCardData[];
   tendencia: OntemTendenciaRow[];
+}
+
+/** Extrai "?dia=AAAA-MM-DD" da URL — só o formato; a validação contra a
+ * lista de dias com contratação cruzada acontece dentro de getOntemData
+ * (que já busca essa lista), pra não duplicar a chamada. */
+function parseDiaParam(v: string | string[] | undefined): string | null {
+  const s = Array.isArray(v) ? v[0] : v;
+  return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
 function toDrillRows(arr: unknown): DrillRow[] {
@@ -376,14 +405,32 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
   return buildRadarCards(d2, d3, d4, d6, prazoHist);
 }
 
-async function getOntemData(): Promise<OntemData> {
+async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
   const supabase = await createSupabaseServerClient();
-  const refRes = await supabase.rpc("ontem_dia_referencia");
+  const [refRes, diasRes] = await Promise.all([
+    supabase.rpc("ontem_dia_referencia"),
+    supabase.rpc("ontem_dias_disponiveis"),
+  ]);
   if (refRes.error) throw new Error(refRes.error.message);
-  const ref = (refRes.data as string | null) ?? null;
+  if (diasRes.error) throw new Error(diasRes.error.message);
+  const diaMaisRecente = (refRes.data as string | null) ?? null;
+  const diasDisponiveis = ((diasRes.data as Record<string, unknown>[]) ?? []).map((r) => String(r.dia));
+  // Só aceita o dia escolhido na URL se ele realmente tem contratação
+  // cruzada — senão cai no padrão (último dia), silenciosamente, em vez de
+  // mostrar um painel vazio pra um dia inválido/digitado à mão na URL.
+  const ref = diaEscolhido && diasDisponiveis.includes(diaEscolhido) ? diaEscolhido : diaMaisRecente;
 
   if (!ref) {
-    return { ref: null, kpis: null, linhas: [], cobertura: null, radar: [], tendencia: [] };
+    return {
+      ref: null,
+      diaMaisRecente,
+      diasDisponiveis,
+      kpis: null,
+      linhas: [],
+      cobertura: null,
+      radar: [],
+      tendencia: [],
+    };
   }
 
   const [kpisRes, linhasRes, coberturaRes, tendenciaRes, radar] = await Promise.all([
@@ -445,7 +492,7 @@ async function getOntemData(): Promise<OntemData> {
     soma_diff_pos: Number(r.soma_diff_pos ?? 0),
   }));
 
-  return { ref, kpis, linhas, cobertura, radar, tendencia };
+  return { ref, diaMaisRecente, diasDisponiveis, kpis, linhas, cobertura, radar, tendencia };
 }
 
 // Cobertura do dia
@@ -563,20 +610,26 @@ function RadarCardView({ c }: { c: RadarCardData }) {
   );
 }
 
-export default async function OntemPage() {
+type OntemSearchParams = Record<string, string | string[] | undefined>;
+
+export default async function OntemPage({ searchParams }: { searchParams: Promise<OntemSearchParams> }) {
   // [D-28] Rede de segurança independente de proxy.ts — ver comentário em
   // src/lib/supabase-server.ts.
   await requireUser("/ontem");
+  const sp = await searchParams;
+  const diaEscolhido = parseDiaParam(sp.dia);
   let data: OntemData | null = null;
   let erro: string | null = null;
   try {
-    data = await getOntemData();
+    data = await getOntemData(diaEscolhido);
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
 
   const kpis = data?.kpis;
   const ref = data?.ref ?? null;
+  const diaMaisRecente = data?.diaMaisRecente ?? null;
+  const diasDisponiveis = data?.diasDisponiveis ?? [];
   const linhas = data?.linhas ?? [];
   const cobertura = data?.cobertura ?? null;
   const radarCardsList = data?.radar ?? [];
@@ -619,7 +672,7 @@ export default async function OntemPage() {
             <p>
               Fechamento do último dia com contratações cruzadas a uma cotação — os mesmos
               indicadores e a mesma tabela da página &quot;Ontem&quot; do Artifact atual, agora lendo
-              direto do Supabase.
+              direto do Supabase. Já é possível escolher outro dia específico no seletor abaixo.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
@@ -640,8 +693,11 @@ export default async function OntemPage() {
         ) : (
           <>
             <section className="bloc" style={{ marginTop: 0 }}>
-              <div className="bloc-head" style={{ alignItems: "center" }}>
+              <div className="bloc-head" style={{ alignItems: "center", justifyContent: "space-between" }}>
                 <h2>Ontem — decisões de contratação</h2>
+                <Suspense fallback={<div className="dia-selector" />}>
+                  <DiaSelector dias={diasDisponiveis} atual={ref} diaMaisRecente={diaMaisRecente} />
+                </Suspense>
               </div>
               <div className="op-note" style={{ marginBottom: 16 }}>
                 Decisões de <b>{fmtDate(ref)}</b> &middot; {fmtNum(totalDia)} contratações &middot;{" "}
