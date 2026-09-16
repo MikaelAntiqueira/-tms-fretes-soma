@@ -1,7 +1,22 @@
 # Pendências — TMS Fretes SOMA
 
-> Tarefas abertas e esperando ação. Última atualização: 2026-09-14.
+> Tarefas abertas e esperando ação. Última atualização: 2026-09-16.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
+
+## ✅ INVESTIGADO 2026-09-16 — issue #1 do GitHub ("Possible exposed API Key"), falso alarme
+
+Bot público (`Leakwatch-Alert-Bot`) abriu a [issue #1](https://github.com/MikaelAntiqueira/-tms-fretes-soma/issues/1)
+alertando um "JWT exposto" no commit `6129876` (arquivo `COMANDO_configurar_
+env_vars_vercel.md`). Investigado: é a `NEXT_PUBLIC_SUPABASE_ANON_KEY` —
+exatamente a chave pública/anon do Supabase, feita pra ser embutida em
+código client-side (por isso o prefixo `NEXT_PUBLIC_`; ela já vai em todo
+bundle JS que o navegador baixa, exposta de qualquer forma). Confirmado
+direto no banco: as 5 tabelas de dado (`clientes`/`cotacoes`/`ofertas`/
+`contratacoes`/`transportadoras`) têm RLS habilitado (`relrowsecurity=true`)
+com policy de SELECT restrita à role `authenticated` — a anon key sozinha
+não lê nenhum dado de negócio. **Não precisa rotacionar nada.** Fica
+pendente só a decisão do Mikael de responder/fechar a issue no GitHub (ação
+que exige confirmação explícita dele, não foi feita autonomamente).
 
 ## ✅ RESOLVIDO 2026-09-14 — 500 em /operacao: causa raiz real era timeout de DB, não (só) o middleware
 
@@ -211,7 +226,11 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       `SECURITY INVOKER` (só `handle_new_user`, o trigger de provisionamento, é `SECURITY DEFINER`
       — correto, precisa de privilégio elevado pra criar o profile no signup). RLS restrita a
       `authenticated` está sendo respeitada de ponta a ponta.
-- [ ] Documentar RPCs criados (já parcialmente feito nos comments dos arquivos)
+- [x] ~~Documentar RPCs criados~~ — **feito 2026-09-16**, via `COMMENT ON FUNCTION` (migrations
+      `docs_comment_on_function_rpcs_restantes` + `docs_comment_handle_new_user`): as 39
+      functions do schema `public` agora têm comentário (proposito/página que consome/se reage
+      ao filtro global) — só 7 já tinham antes desta rodada. Zero mudança de comportamento
+      (só metadados). Consultável com `\df+` no psql ou `obj_description(oid, 'pg_proc')`.
 
 ## Validação
 
