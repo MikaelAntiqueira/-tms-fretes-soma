@@ -71,3 +71,22 @@ export async function requireUser(currentPath?: string) {
 
   return user;
 }
+
+// Guarda de autorização — igual requireUser(), mas também exige
+// profiles.role = 'admin' (D-12: só mikaelantiqueira@gmail.com tem esse
+// role; qualquer outro usuário fica com 'user' via handle_new_user()).
+// Usada por páginas administrativas (ex. /importar), que fazem TRUNCATE nas
+// tabelas de fato — não é pra qualquer usuário autenticado acessar. Redireciona
+// pra "/" (não pra /login — o usuário já está logado, só não tem permissão)
+// quando o role não é admin.
+export async function requireAdmin(currentPath?: string) {
+  const user = await requireUser(currentPath);
+  const supabase = await createSupabaseServerClient();
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+
+  if (profile?.role !== "admin") {
+    redirect("/");
+  }
+
+  return user;
+}

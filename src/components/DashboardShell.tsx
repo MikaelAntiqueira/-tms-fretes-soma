@@ -143,6 +143,23 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    // Área administrativa (2026-09-16) — visível no menu pra qualquer
+    // usuário logado, mas a página em si (requireAdmin()) só deixa passar
+    // role='admin'. Mostrar o item sempre é mais simples que este componente
+    // (client, sem saber o role) tentar decidir visibilidade — quem não é
+    // admin só é redirecionado pra "/" ao clicar.
+    href: "/importar",
+    label: "Importar Dados",
+    title: "Importar Dados — atualizar cotações/ofertas/contratações/clientes/transportadoras",
+    icon: (
+      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
+        <path d="M12 4v11" />
+        <path d="M7.5 10.5 12 15l4.5-4.5" />
+        <path d="M4.5 17.5v2a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-2" />
+      </svg>
+    ),
+  },
 ];
 
 export function DashboardShell({ children, stats }: { children: ReactNode; stats?: ReactNode }) {
