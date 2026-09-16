@@ -216,7 +216,9 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
 
 - [x] chartClassif ("Classificação por impacto", doughnut) — portado em `src/components/ClassificacaoChart.tsx`
 - [x] `ontTendChart` ("Diferença dos últimos 15 dias", barra) — portado em `src/components/OntemTendenciaChart.tsx` + RPC `ontem_tendencia_15_dias` (migration `fn_ontem_tendencia_15_dias`). Os 16/16 gráficos do Artifact original agora têm equivalente no Next.js.
-- [ ] Validar campo a campo cada gráfico portado com sistema de referência
+- [x] ~~Validar campo a campo cada gráfico portado com sistema de referência~~ — **16/16
+      feito 2026-09-16**, ver seção "Filtro Global — Fase 1" mais abaixo (técnica
+      `Chart.instances` + comparação com as RPCs).
 
 ### Tabelas restantes — inventário corrigido em 2026-09-14
 
@@ -233,15 +235,13 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
 > | opQuem, opCidades | `operacao/page.tsx` |
 
 - [x] `tblDetalhe` — tabela paginada/pesquisável da página "Dados" — portada em `src/app/dados/page.tsx` + RPC `dados_detalhe` (migration `fn_dados_detalhe`, busca/ordenação/paginação no Postgres, nunca carregando a base inteira pro cliente — [D-05]). Reaproveita `v_ontem_comparacao` (mesma fonte de melhor cotação/diferença/escolheu já usada no resto do app) em vez de recalcular. Coluna "Valor Declarado" do original NÃO existe em nenhuma tabela do schema atual — omitida, não estimada ([R-DADO]). Item adicionado ao menu lateral (`DashboardShell.tsx`), antes só acessível pelo rodapé no Artifact original. As 10/10 tabelas do Artifact original agora têm equivalente no Next.js.
-- [ ] Página "Metodologia" (dicionário de indicadores, rodapé do Artifact original) — não é uma das 10 tabelas mas também não existe rota ainda, citada no mapa de migração seção 1.1.
-      **Investigado 2026-09-16, não portado ainda de propósito**: o Artifact original só
-      REFERENCIA um "Dicionário de Indicadores" (Bloco 14 no v40), não embute o conteúdo
-      completo dele nesta página — o dicionário "fonte" é `memoria/05_DICIONARIO_KPIS.md` do
-      projeto original (Drive), que tem ~9 meses de números já superados por `[CHANGE-031]`/
-      `[CHANGE-034]` e por decisões mais recentes ([DEC-15], [DEC-25], etc.). Publicar essa
-      página exige reconciliar cada indicador com o valor/regra ATUAL (já validado nas RPCs),
-      não só copiar o markdown antigo — risco real de publicar número/fórmula desatualizada.
-      Fica pendente de uma sessão dedicada a essa reconciliação, não uma tarefa mecânica.
+- [x] ~~Página "Metodologia" (dicionário de indicadores)~~ — **decisão do Mikael 2026-09-16:
+      NÃO como rota do site** (o Artifact original só REFERENCIA um "Dicionário de Indicadores",
+      nunca embute o conteúdo completo dele numa página própria — não é uma das 10 tabelas).
+      Escrito como arquivo markdown de referência no próprio repositório —
+      `central-contexto/METODOLOGIA.md` — reconciliado com o valor/regra ATUAL de cada
+      indicador (RPCs já validadas e decisões D-XX/DEC-XX FINAIS), não com o dicionário
+      original de ~9 meses atrás (esse tinha números já superados por correções posteriores).
 - [x] ~~Validar tabela "Cubagem e custo unitário" (tblCbmCusto) e "Outliers de Peso x Frete"~~ —
       **validadas 2026-09-16** contra o Artifact v40: `financeiro_cubagem_custo()` bate
       dígito a dígito em 5 das 6 faixas (n/peso/cbm/frete/custo_kg/custo_m3 idênticos). Única
@@ -434,7 +434,10 @@ não fiz agora porque é uma mudança de arquitetura maior, não algo pra decidi
 - [x] Confirmar que R$ 494.417,43 continua batendo após novas alterações — **confirmado 2026-09-14**
       (R$ 494.417,43 / 5.194 contratações cruzadas, consulta direta em `contratacoes`, sem
       passar por nenhuma view — inabalado pelas correções desta sessão)
-- [ ] Validar cada nova página/gráfico/tabela campo a campo antes de avançar
+- [x] ~~Validar cada nova página/gráfico/tabela campo a campo antes de avançar~~ — feito para
+      tudo que existe hoje (16 gráficos/10 tabelas/11 dimensões, 2026-09-16). Continua valendo
+      como prática padrão pra qualquer página/gráfico/tabela nova que for portada no futuro —
+      não é um item que "termina", é uma regra permanente do projeto.
 
 ## Issues identificados
 
