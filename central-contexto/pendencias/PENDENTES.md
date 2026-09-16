@@ -256,8 +256,34 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       provável (dados mudaram em 5 dias de correções, não lógica errada). Não investigado a
       fundo qual migration especificamente zerou o peso dessas 1.906 linhas — se importar,
       abrir uma investigação dedicada com `git log` das migrations entre 11/09 e 14/09.
-- [ ] Validar as demais tabelas/gráficos portados campo a campo (16 gráficos, 8 tabelas
-      restantes — ver inventário nas seções acima)
+- [x] ~~Validar 11 dos 16 gráficos portados campo a campo~~ — **2026-09-16**, técnica nova:
+      o Chart.js mantém `Chart.instances` viva mesmo depois de trocar de aba no Artifact v40
+      (SPA sem destruir canvas antigos) — bastou navegar pelas abas uma vez e ler
+      `Chart.instances` via `javascript_tool` pra capturar os dados de quase todos os gráficos
+      de uma vez, sem precisar interagir com cada um. **Bateram exatos** (valores ou % com
+      diferença só de arredondamento): `chartEvolucao`/`chartEconomiaMes`
+      (`financeiro_evolucao_mensal`), `chartEscolheu` (esc_s/n/sc), `chartDiffPrazo`
+      (`financeiro_diff_por_prazo`), `chartDiffUf` (`financeiro_diff_por_regiao`),
+      `chartDiffTransp` (`financeiro_diff_por_transportadora`), `chartDiffTipo`
+      (`financeiro_diff_por_tipo_cliente`), `chartPrazo` (`financeiro_prazo_frete_medio`),
+      `ontTendChart` (`ontem_tendencia_15_dias`), `chartMaisBarata` + `chartContrxBarata`
+      (`transportadoras_comparativo` — vezes_mais_barata/pct_mais_barata/pct_contratada, 7
+      transportadoras, todas exatas).
+      **`chartPeso` (`financeiro_peso_frete`) tem a MESMA causa de drift já registrada acima**
+      (faixa de peso/outliers): o total de linhas com `peso_considerado` não-nulo caiu de 5.194
+      (no snapshot do Artifact, 11/09) pra 3.288 (hoje) — as MESMAS 1.906 linhas que perderam o
+      peso na tabela de cubagem também afetam este gráfico. Formato/ordem dos 8 buckets e a
+      tendência (n caindo, frete_medio subindo por faixa) continuam corretos — só a MAGNITUDE
+      dos números mudou, coerente com dado que mudou entre 11/09 e hoje, não lógica errada.
+      **Ainda faltam 5 gráficos**: `chartUf`/`chartClientes` (`transportadoras_regiao_
+      comercial`/`clientes_metricas`), `chartQuadrante` (`transportadoras_prazo_medio`),
+      `chartClassif` (contagens da view `comparacoes`), `chartClassif`'s underlying `comparacoes`
+      counts. E as tabelas: `ontTabela`, `tblPrazoHist`/`tblTransp`/`tblCidades`,
+      `tblOportunidades`, `opQuem`/`opCidades` (inventário completo nas seções acima).
+      **Pra continuar à tarde**: reabrir `http://127.0.0.1:8791/artifact-v40-2026-09-11.html`
+      (servir com `python -m http.server 8791` dentro de `dashboard-restore-points/`), navegar
+      pra `/transportadoras` (todas as 5 sub-abas, pra instanciar os canvases que faltam) e
+      `/oportunidades`, e repetir `Chart.instances` via `javascript_tool`.
 
 ## ✅ CORRIGIDO 2026-09-16 — cliques no filtro/seletor de dia pareciam "travados" (sem feedback visual)
 
