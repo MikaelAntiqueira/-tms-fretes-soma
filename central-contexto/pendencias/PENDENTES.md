@@ -242,7 +242,49 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       página exige reconciliar cada indicador com o valor/regra ATUAL (já validado nas RPCs),
       não só copiar o markdown antigo — risco real de publicar número/fórmula desatualizada.
       Fica pendente de uma sessão dedicada a essa reconciliação, não uma tarefa mecânica.
-- [ ] Validar cada tabela portada campo a campo
+- [x] ~~Validar tabela "Cubagem e custo unitário" (tblCbmCusto) e "Outliers de Peso x Frete"~~ —
+      **validadas 2026-09-16** contra o Artifact v40: `financeiro_cubagem_custo()` bate
+      dígito a dígito em 5 das 6 faixas (n/peso/cbm/frete/custo_kg/custo_m3 idênticos). Única
+      diferença: a faixa "Não informado" mostra peso=0 hoje (era 147.586kg no v40) — confirmado
+      direto no banco que as 1.906 linhas dessa faixa têm `peso_considerado` NULL agora em
+      `v_financeiro_padroes_base` (0 de 1.906 com peso). n e frete continuam idênticos (1.906 /
+      R$162.214), só o peso mudou — não é um bug de lógica SQL (a fórmula está certa,
+      `sum(coalesce(peso,0))`), é o DADO em si que mudou entre o snapshot do Artifact (11/09) e
+      hoje (16/09), provavelmente por alguma correção de qualidade de dado no meio do caminho
+      ([D-22]/[D-24] mexeram em views próximas dessa). `financeiro_outliers_peso()` tem drift
+      parecido (medianas por faixa mudaram ~10-30%, ranking dos top-10 mudou) — mesma explicação
+      provável (dados mudaram em 5 dias de correções, não lógica errada). Não investigado a
+      fundo qual migration especificamente zerou o peso dessas 1.906 linhas — se importar,
+      abrir uma investigação dedicada com `git log` das migrations entre 11/09 e 14/09.
+- [ ] Validar as demais tabelas/gráficos portados campo a campo (16 gráficos, 8 tabelas
+      restantes — ver inventário nas seções acima)
+
+## ✅ CORRIGIDO 2026-09-16 — cliques no filtro/seletor de dia pareciam "travados" (sem feedback visual)
+
+Mikael relatou (em produção, /ontem e /financeiro): "as transições estão lentas, quando eu
+clico demora pra fazer a ação". Investigado: nenhuma rota tinha `loading.tsx` (convenção do
+Next.js App Router) — como FilterBar/DiaSelector navegam via `router.push` (troca de URL, sem
+`<Link>` com prefetch), o clique não mostrava NENHUM feedback até o Server Component terminar
+de buscar tudo no Supabase — parecia tela travada mesmo que o servidor estivesse processando
+normalmente. **Corrigido**: `src/app/loading.tsx` (raiz do app, cobre todas as rotas com um
+único Suspense boundary automático do Next.js) — mostra um spinner imediatamente a cada
+navegação/mudança de filtro.
+
+**Achado de performance real, não corrigido ainda** (fora do escopo desta correção pontual):
+`/financeiro` dispara **16 RPCs em paralelo** a cada clique no filtro (`getFinanceiroData()`),
+mas só ~6 delas de fato usam os parâmetros do filtro — as outras ~10 (`financeiro_evolucao_
+mensal`, `financeiro_diff_por_prazo/regiao/transportadora/tipo_cliente`, `financeiro_peso_
+frete`, `financeiro_outliers_peso`, `financeiro_prazo_frete_medio`, `financeiro_cubagem_custo`)
+são "base completa, não reage ao filtro" — ou seja, retornam o MESMO resultado independente do
+filtro, mas são recalculadas do zero a cada clique porque a página é `force-dynamic` sem cache
+entre requisições. O seletor de dia de `/ontem` tem problema parecido: trocar o dia dispara
+~7 RPCs (`ontem_kpis`/`ontem_contratacoes`/`ontem_cobertura`/`ontem_tendencia_15_dias` +
+`radar_prazo_hist`/`radar_d2`/`radar_d3`/`radar_d4`/`radar_d6` dentro de `getRadarData`). Como
+todas rodam em paralelo (`Promise.all`), o tempo total tende ao da mais lenta, não à soma — mas
+ainda é uma banda desnecessária de conexões simultâneas no Supabase. Otimização futura: cache
+(`unstable_cache`/`revalidate`) nas ~10 RPCs de `/financeiro` que nunca mudam com o filtro —
+não fiz agora porque é uma mudança de arquitetura maior, não algo pra decidir sob pressão de
+"fechar hoje".
 
 ### Funcionalidades
 - [x] ~~Simulação de Custo por Transportadora (4º bloco da Visão Geral)~~ — **portada 2026-09-14**
