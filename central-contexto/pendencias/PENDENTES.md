@@ -180,21 +180,17 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       **Não confirmado ainda** (mesma limitação do item acima — sem sessão autenticada pra
       testar no navegador): falta o Mikael abrir `/ontem`, trocar o dia no seletor e confirmar
       visualmente que os KPIs/Radar/tabela mudam e a página não quebra.
-- [ ] Validar as 11 dimensões campo a campo contra o Artifact original — **6 de 11 validadas**
-      (Mês/Transportadora/Região/Tipo da Fase 1 + **esc** e **janela**, validadas 2026-09-16
-      via Browser tool servindo `dashboard-restore-points/artifact-v40-2026-09-11.html`
-      localmente + comparação direta com `financeiro_visao_geral_kpis()`):
-      - `p_esc:=array['N']` → frete_total 177.118,70/1.392, diff_pos_sum 45.938,44,
-        esc_s/n/sc = 0/1.392/0 — bate dígito a dígito com o Artifact filtrado por
-        "Escolheu a Mais Barata? = Não".
-      - `p_janelas:=array['Meio-dia']` → frete_total 51.742,43/976, diff_pos_sum 2.019,72
-        (623 comparáveis), esc_s/n/sc = 500/123/353 — bate dígito a dígito com o Artifact
-        filtrado por "Janela de Contratação = Meio-dia".
-      **Ainda faltam**: romaneio, prazo, cidade, faixaPeso, faixaCubagem. O Artifact de
-      referência (v40) está em `dashboard-restore-points/` no Drive — não precisa de sessão
-      autenticada pra abrir (é um HTML standalone com dado embutido), só servir localmente
-      (`python -m http.server` na pasta) porque o Browser tool não abre `file://` em drive de
-      rede diretamente.
+- [x] ~~Validar as 11 dimensões campo a campo contra o Artifact original~~ — **11 de 11
+      validadas, 2026-09-16** (Browser tool servindo `dashboard-restore-points/
+      artifact-v40-2026-09-11.html` localmente + comparação direta com
+      `financeiro_visao_geral_kpis()`/`v_cotacao_filtros`). Mês/Transportadora/Região/Tipo já
+      eram da Fase 1; validadas nesta rodada: esc, janela, romaneio, prazo, cidade,
+      faixaCubagem (todas bateram dígito a dígito de primeira) e **faixaPeso** (achou e
+      corrigiu um bug real — ver seção "CORRIGIDO 2026-09-16" acima, D-31 em
+      LOG_DECISOES.md). Único ponto aberto: o total de processos da dimensão faixaPeso
+      ainda não bate 100% com essa versão específica do Artifact (provável DEC-27 não
+      propagado no v40) — não é uma dimensão pendente de validar, é uma nuance registrada
+      pra confirmação futura do Mikael.
 
 ## Dashboard completo (fase futura)
 
