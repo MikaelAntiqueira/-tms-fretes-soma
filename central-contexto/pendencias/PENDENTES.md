@@ -366,7 +366,8 @@ Next.js App Router) — como FilterBar/DiaSelector navegam via `router.push` (tr
 de buscar tudo no Supabase — parecia tela travada mesmo que o servidor estivesse processando
 normalmente. **Corrigido**: `src/app/loading.tsx` (raiz do app, cobre todas as rotas com um
 único Suspense boundary automático do Next.js) — mostra um spinner imediatamente a cada
-navegação/mudança de filtro.
+navegação/mudança de filtro. **Confirmado pelo Mikael em produção (2026-09-16): a lentidão
+melhorou.**
 
 **Achado de performance real, não corrigido ainda** (fora do escopo desta correção pontual):
 `/financeiro` dispara **16 RPCs em paralelo** a cada clique no filtro (`getFinanceiroData()`),
