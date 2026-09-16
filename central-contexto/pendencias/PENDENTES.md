@@ -408,7 +408,13 @@ não fiz agora porque é uma mudança de arquitetura maior, não algo pra decidi
       navegador (arquivos somam ~23MB, além do limite de corpo de requisição de uma function
       da Vercel). Ponte deliberadamente simples/temporária — Mikael confirmou que isso só
       existe até surgir uma fonte de dados melhor (API do TMS/ERP), não é arquitetura final.
-      **Não confirmado ainda**: falta o Mikael testar de fato (subir os 3 arquivos e ver os
+      **Ajuste 2026-09-16 (tarde)**: Mikael achou 3 campos de upload separados complicado —
+      trocado por seleção de PASTA única (`codigo\`, `<input webkitdirectory>`, commit
+      `2e0673f`): 1 clique, o site acha os 3 arquivos certos por nome dentro da pasta e mostra
+      quais achou/faltou antes de liberar. Confirmado que não dá pra reduzir a 1 ou 2 arquivos
+      de verdade sem perder dado — a aba "Clientes" da planilha é só uma lista de pendências
+      manuais (664 linhas), não o cadastro completo (3.563 em `cnpj_to_info.json`).
+      **Não confirmado ainda**: falta o Mikael testar de fato (selecionar a pasta e ver os
       totais baterem na tela) — não há como logar como ele pra testar isso no navegador.
 
 ## Auth e segurança — RESOLVIDO 2026-09-14 (doc estava desatualizada, corrigida agora)
