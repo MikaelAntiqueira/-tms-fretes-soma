@@ -314,7 +314,7 @@ corrigiu o dropdown "Tipo" de `/oportunidades.page.tsx` (tinha o MESMO bug — a
 `["Público","Privado","Grupo"]` que nunca casava com "Publico" real — agora deriva das
 próprias linhas, como mes/regiao já faziam).
 
-## ⚠️ ACHADO, NÃO CORRIGIDO 2026-09-16 — KPIs do topo de /operacao parecem contar universo errado
+## ✅ CORRIGIDO 2026-09-16 (tarde) — KPIs do topo de /operacao contavam universo errado
 
 Validando `opQuem`/`opCidades` contra o Artifact: a tabela "Quem está carregando" (por
 transportadora) bate EXATA (7 transportadoras, todas as colunas) — mas os **KPIs do topo da
@@ -339,16 +339,23 @@ contratado = só o que tem preço fechado) — mas a migration atual (`operacao_
 estatico()`, sobre `v_operacao_base` = só cruzadas) restringiu TUDO a cruzadas, subcontando a
 visão operacional real.
 
-**Tentativa de achar a fonte exata, sem sucesso ainda**: `select count(distinct romaneio),
-count(distinct pedido), sum(qtd_volumes), sum(peso_real_kg), sum(cubagem_m3) from cotacoes`
-bate EXATO em Volumes (67.198) e Cubagem (2.507,0), mas não em Romaneios (429≠496)/Pedidos
-(4.440≠5.324)/Peso real (519.198≠666.784) — sugere que romaneio/pedido/peso vêm de uma UNIÃO
-entre `cotacoes` e `contratacoes` (ou de um `COALESCE` tipo o já usado em `dados_detalhe`:
-`coalesce(c.pedido, ct.pedido)`), não de uma tabela isolada. Não decifrado no tempo de hoje —
-fica pra uma sessão dedicada, com mais tempo pra rastrear `codigo/build_workbook.py` (a
-construção de `_dash_base`) linha a linha antes de tocar em SQL de produção outra vez. **Não é
-uma correção pra fazer com pressa** — muda o número que mais chama atenção na página, então
-merece ter 100% de certeza da fonte antes de mudar.
+**Investigado a fundo em `codigo/build_workbook.py` (a pedido do Mikael) e corrigido**: linha
+549 mostra `romaneio = s["romaneio"] or <derivado do pedido da contratação>` e linha 593 mostra
+`peso_val = s["peso"] if not None else contratado.peso_real_kg` — o Python original tinha
+fallbacks pra pedido/peso que a migration não replicava. Testado com `COALESCE` pra pedido/peso
+puxando da contratação vinculada quando a cotação não tem (`left join lateral` em
+`contratacoes`): bateu EXATO em 4 dos 5 KPIs.
+
+**Corrigido** (migration `fix_operacao_kpis_toda_base_nao_so_cruzadas`, commit `bcaac7b`):
+`operacao_dashboard_estatico().kpis` agora soma sobre `cotacoes` (com o COALESCE acima), não
+mais sobre `v_operacao_base`. Validado: Pedidos 5.324 ✓, Peso real 666.784 kg ✓, Volumes
+67.198 ✓, Cubagem 2.507,0 m³ ✓, Frete Contratado 494.417,43 ✓ (inalterado, já estava certo).
+Só **Romaneios ficou em 429** (Artifact mostra 496) — decisão deliberada de NÃO replicar a
+heurística legada `_romaneio_do_pedido()` (derivava um romaneio sintético do texto do pedido
+quando a cotação não tinha nenhum) porque `contratacoes` não tem coluna `romaneio` no schema
+atual — usar `cotacoes.romaneio` direto é mais correto pro schema normalizado de hoje.
+`carriers`/`janela_carriers`/`cidades` (tabelas "Quem está carregando"/"Cidade × Transportadora")
+NÃO mudaram — continuam só cruzadas, já validados exatos antes desta correção.
 
 ## ✅ CORRIGIDO 2026-09-16 — cliques no filtro/seletor de dia pareciam "travados" (sem feedback visual)
 
