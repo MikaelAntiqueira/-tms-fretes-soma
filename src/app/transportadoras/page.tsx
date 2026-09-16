@@ -691,23 +691,23 @@ export default async function TransportadorasPage({
                 <div className="sub">demais itens da página original "Transportadoras & Cidades"</div>
                 <div className="alert-card info" style={{ marginTop: 8 }}>
                   <ul>
-                    <li>
+                    <li className="notes">
                       <span className="name">Performance</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>
+                      <span className="num notes" style={{ color: "var(--text-muted)" }}>
                         não é uma aba própria — mesma tabela de "Comparativo" (fusão já decidida)
                       </span>
                     </li>
-                    <li>
+                    <li className="notes">
                       <span className="name">Preço × Prazo (Quadrante), Região Comercial, Clientes, Cidades</span>
-                      <span className="num" style={{ color: "var(--text-muted)" }}>
+                      <span className="num notes" style={{ color: "var(--text-muted)" }}>
                         ainda mostram sempre a base completa — a RPC `transportadoras_comparativo` já tem os
                         4 parâmetros de filtro, mas as demais 5 RPCs desta página não ganharam parâmetros
                         nesta etapa
                       </span>
                     </li>
-                    <li>
+                    <li className="notes">
                       <span className="name">Motor de filtro — demais abas/páginas</span>
-                      <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                      <span className="num notes" style={{ color: "var(--text-muted)" }}>
                         "Cotado × Contratado"/"Padrões da Diferença"/"Peso, Cubagem & Custo" e as demais
                         4 páginas do dashboard ainda não reagem ao filtro — Fase 1 trouxe só /financeiro
                         (Visão Geral) e Fase 2 trouxe /transportadoras (Comparativo) e /operacao

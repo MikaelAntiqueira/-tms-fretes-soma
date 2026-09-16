@@ -554,6 +554,14 @@ section.bloc { margin-top: 34px; }
 .alert-card.warn .dot { background: var(--warning); }
 .alert-card.warn h4 { color: var(--warning); }
 
+/* ---- Variante para notas longas (pendências/fora do escopo/aguardando
+   dado) — o `.num` acima foi desenhado para valores curtos (ex.: "R$
+   1.234,56") e corta com nowrap quando o conteúdo é uma frase inteira.
+   Aqui o item empilha (nome acima, descrição abaixo) e a descrição quebra
+   linha normalmente, em qualquer largura de tela. */
+.alert-card li.notes { flex-direction: column; align-items: flex-start; gap: 3px; }
+.alert-card li.notes .num { white-space: normal; text-align: left; font-weight: 500; }
+
 /* ---- Tabela "Todas as contratações do dia" (e drill-down do Radar) ---- */
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 table.data { border-collapse: collapse; width: 100%; font-size: 12px; }
@@ -843,6 +851,10 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   .mobile-nav-toggle { display: flex; align-items: center; justify-content: center; }
   .sidebar-scrim.open { display: block; }
   .with-sidebar, .with-sidebar.collapsed { margin-left: 0; }
+
+  /* Reserva espaço pro botão de menu (fixed, 42px + 14px de margem) não
+     ficar em cima do eyebrow/h1 do cabeçalho de cada página. */
+  .app-header-inner { padding-left: 46px; }
 }
 
 /* ==========================================================================

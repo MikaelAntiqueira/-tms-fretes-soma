@@ -746,15 +746,15 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                   <div className="sub">detectores que ligam quando a informação chegar da gestão / do TMS</div>
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
-                      <li>
+                      <li className="notes">
                         <span className="name">Oportunidade objetiva (prazo + prestação iguais)</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>
+                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
                           aguarda prazo e prestação por oferta (TMS/API)
                         </span>
                       </li>
-                      <li>
+                      <li className="notes">
                         <span className="name">Frete mínimo fora do parâmetro</span>
-                        <span className="num" style={{ color: "var(--text-muted)" }}>
+                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
                           aguarda os valores por transportadora (gestão)
                         </span>
                       </li>

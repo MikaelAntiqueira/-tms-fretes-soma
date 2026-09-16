@@ -1038,23 +1038,23 @@ export default async function FinanceiroPage({
                   <div className="sub">próximas etapas do motor de filtro</div>
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
-                      <li>
+                      <li className="notes">
                         <span className="name">Simulação de Custo por Transportadora</span>
-                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
                           fora de propósito nesta etapa — regra &quot;nunca estima, sempre real, operação a
                           operação&quot; merece validação própria, com mais tempo
                         </span>
                       </li>
-                      <li>
+                      <li className="notes">
                         <span className="name">Motor de filtro — cascata de opções</span>
-                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
                           os dropdowns ainda mostram sempre a lista completa de valores, não podada pelos
                           outros filtros ativos (ver FilterBar.tsx)
                         </span>
                       </li>
-                      <li>
+                      <li className="notes">
                         <span className="name">Motor de filtro — demais sub-abas/páginas</span>
-                        <span className="num" style={{ color: "var(--text-muted)", whiteSpace: "normal", textAlign: "right" }}>
+                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
                           &quot;Cotado × Contratado&quot;/&quot;Padrões da Diferença&quot;/&quot;Peso, Cubagem
                           &amp; Custo&quot; e as demais 4 páginas do dashboard ainda não reagem ao filtro
                         </span>
