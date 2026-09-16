@@ -140,8 +140,21 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       **Não confirmado ainda** (mesma limitação do item acima — sem sessão autenticada pra
       testar no navegador): falta o Mikael abrir `/ontem`, trocar o dia no seletor e confirmar
       visualmente que os KPIs/Radar/tabela mudam e a página não quebra.
-- [ ] Validar as 11 dimensões campo a campo contra o Artifact original (só as 4 da Fase 1 foram
-      validadas por Playwright até agora)
+- [ ] Validar as 11 dimensões campo a campo contra o Artifact original — **6 de 11 validadas**
+      (Mês/Transportadora/Região/Tipo da Fase 1 + **esc** e **janela**, validadas 2026-09-16
+      via Browser tool servindo `dashboard-restore-points/artifact-v40-2026-09-11.html`
+      localmente + comparação direta com `financeiro_visao_geral_kpis()`):
+      - `p_esc:=array['N']` → frete_total 177.118,70/1.392, diff_pos_sum 45.938,44,
+        esc_s/n/sc = 0/1.392/0 — bate dígito a dígito com o Artifact filtrado por
+        "Escolheu a Mais Barata? = Não".
+      - `p_janelas:=array['Meio-dia']` → frete_total 51.742,43/976, diff_pos_sum 2.019,72
+        (623 comparáveis), esc_s/n/sc = 500/123/353 — bate dígito a dígito com o Artifact
+        filtrado por "Janela de Contratação = Meio-dia".
+      **Ainda faltam**: romaneio, prazo, cidade, faixaPeso, faixaCubagem. O Artifact de
+      referência (v40) está em `dashboard-restore-points/` no Drive — não precisa de sessão
+      autenticada pra abrir (é um HTML standalone com dado embutido), só servir localmente
+      (`python -m http.server` na pasta) porque o Browser tool não abre `file://` em drive de
+      rede diretamente.
 
 ## Dashboard completo (fase futura)
 
@@ -184,7 +197,15 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
 > | opQuem, opCidades | `operacao/page.tsx` |
 
 - [x] `tblDetalhe` — tabela paginada/pesquisável da página "Dados" — portada em `src/app/dados/page.tsx` + RPC `dados_detalhe` (migration `fn_dados_detalhe`, busca/ordenação/paginação no Postgres, nunca carregando a base inteira pro cliente — [D-05]). Reaproveita `v_ontem_comparacao` (mesma fonte de melhor cotação/diferença/escolheu já usada no resto do app) em vez de recalcular. Coluna "Valor Declarado" do original NÃO existe em nenhuma tabela do schema atual — omitida, não estimada ([R-DADO]). Item adicionado ao menu lateral (`DashboardShell.tsx`), antes só acessível pelo rodapé no Artifact original. As 10/10 tabelas do Artifact original agora têm equivalente no Next.js.
-- [ ] Página "Metodologia" (dicionário de indicadores, rodapé do Artifact original) — não é uma das 10 tabelas mas também não existe rota ainda, citada no mapa de migração seção 1.1
+- [ ] Página "Metodologia" (dicionário de indicadores, rodapé do Artifact original) — não é uma das 10 tabelas mas também não existe rota ainda, citada no mapa de migração seção 1.1.
+      **Investigado 2026-09-16, não portado ainda de propósito**: o Artifact original só
+      REFERENCIA um "Dicionário de Indicadores" (Bloco 14 no v40), não embute o conteúdo
+      completo dele nesta página — o dicionário "fonte" é `memoria/05_DICIONARIO_KPIS.md` do
+      projeto original (Drive), que tem ~9 meses de números já superados por `[CHANGE-031]`/
+      `[CHANGE-034]` e por decisões mais recentes ([DEC-15], [DEC-25], etc.). Publicar essa
+      página exige reconciliar cada indicador com o valor/regra ATUAL (já validado nas RPCs),
+      não só copiar o markdown antigo — risco real de publicar número/fórmula desatualizada.
+      Fica pendente de uma sessão dedicada a essa reconciliação, não uma tarefa mecânica.
 - [ ] Validar cada tabela portada campo a campo
 
 ### Funcionalidades
