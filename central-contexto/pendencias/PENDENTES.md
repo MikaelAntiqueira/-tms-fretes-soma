@@ -54,9 +54,10 @@ bundle JS que o navegador baixa, exposta de qualquer forma). Confirmado
 direto no banco: as 5 tabelas de dado (`clientes`/`cotacoes`/`ofertas`/
 `contratacoes`/`transportadoras`) têm RLS habilitado (`relrowsecurity=true`)
 com policy de SELECT restrita à role `authenticated` — a anon key sozinha
-não lê nenhum dado de negócio. **Não precisa rotacionar nada.** Fica
-pendente só a decisão do Mikael de responder/fechar a issue no GitHub (ação
-que exige confirmação explícita dele, não foi feita autonomamente).
+não lê nenhum dado de negócio. **Não precisa rotacionar nada.** **Fechada
+pelo Mikael em 2026-09-16** (o token GitHub desta sessão só tem permissão de
+"Contents", não de "Issues" — comentar/fechar via API retornou 403; ele
+fechou direto no GitHub).
 
 ## ✅ RESOLVIDO 2026-09-14 — 500 em /operacao: causa raiz real era timeout de DB, não (só) o middleware
 
