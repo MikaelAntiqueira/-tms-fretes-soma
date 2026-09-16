@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
   buildImportRows,
@@ -64,11 +64,40 @@ export function ImportarClient() {
   const [progresso, setProgresso] = useState<ProgressoLote[]>([]);
   const [resultadoFinal, setResultadoFinal] = useState<Record<string, number> | null>(null);
 
-  const [fCotacoes, setFCotacoes] = useState<File | null>(null);
-  const [fContratados, setFContratados] = useState<File | null>(null);
-  const [fCnpj, setFCnpj] = useState<File | null>(null);
+  // [AJUSTE 2026-09-16] Mikael achou 3 campos de upload separados
+  // complicado ("ficou ruim, muito arquivo") — a informação realmente vem de
+  // 3 arquivos diferentes (não dá pra juntar sem perder cadastro de cliente
+  // ou detalhe de contratação), mas a AÇÃO agora é uma só: ele seleciona a
+  // pasta `codigo\` inteira (1 clique, <input webkitdirectory>) e o site
+  // acha os 3 arquivos certos dentro dela pelo nome, ignorando o resto
+  // (dashboard_data.json, fase1_*.csv etc. — não usados aqui).
+  const [pastaSelecionada, setPastaSelecionada] = useState<string | null>(null);
+  const [arquivosEncontrados, setArquivosEncontrados] = useState<{
+    cotacoes: File | null;
+    contratados: File | null;
+    cnpj: File | null;
+  }>({ cotacoes: null, contratados: null, cnpj: null });
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function onPastaEscolhida(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    const achar = (nome: string) => files.find((f) => f.name === nome) ?? null;
+    setArquivosEncontrados({
+      cotacoes: achar("cotacoes_reais.json"),
+      contratados: achar("contratados_reais.json"),
+      cnpj: achar("cnpj_to_info.json"),
+    });
+    // webkitRelativePath vem como "codigo/cotacoes_reais.json" — mostra só a
+    // pasta escolhida, não o caminho completo do disco (o navegador não
+    // expõe isso por segurança, nem precisamos).
+    const primeiro = files[0] as (File & { webkitRelativePath?: string }) | undefined;
+    setPastaSelecionada(primeiro?.webkitRelativePath?.split("/")[0] ?? null);
+  }
+
+  const faltando = (["cotacoes", "contratados", "cnpj"] as const).filter((k) => !arquivosEncontrados[k]);
 
   async function analisar() {
+    const { cotacoes: fCotacoes, contratados: fContratados, cnpj: fCnpj } = arquivosEncontrados;
     if (!fCotacoes || !fContratados || !fCnpj) return;
     setFase("analisando");
     setErro(null);
@@ -130,9 +159,9 @@ export function ImportarClient() {
     setBuilt(null);
     setProgresso([]);
     setResultadoFinal(null);
-    setFCotacoes(null);
-    setFContratados(null);
-    setFCnpj(null);
+    setPastaSelecionada(null);
+    setArquivosEncontrados({ cotacoes: null, contratados: null, cnpj: null });
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   return (
@@ -140,44 +169,51 @@ export function ImportarClient() {
       {(fase === "selecionar" || fase === "analisando") && (
         <>
           <div className="bloc-head">
-            <h2>1. Escolher os 3 arquivos</h2>
+            <h2>1. Escolher a pasta</h2>
             <div className="desc">
-              Todos ficam em <code>codigo\</code>, dentro da pasta do projeto no Drive.
+              Selecione a pasta <code>codigo\</code> (dentro da pasta do projeto no Drive) — o site
+              acha sozinho os 3 arquivos que precisa lá dentro.
             </div>
           </div>
-          <div className="grid" style={{ gap: 14, maxWidth: 520 }}>
-            <label>
-              <div className="lbl" style={{ marginBottom: 4 }}>
-                cotacoes_reais.json
+          <input
+            ref={inputRef}
+            type="file"
+            // webkitdirectory: seleção de pasta inteira (Chrome/Edge/Firefox).
+            // @ts-expect-error -- webkitdirectory/directory não estão nos tipos do React ainda
+            webkitdirectory=""
+            directory=""
+            multiple
+            onChange={onPastaEscolhida}
+            style={{ display: "none" }}
+          />
+          <button type="button" className="tab-btn" onClick={() => inputRef.current?.click()}>
+            Selecionar pasta…
+          </button>
+
+          {pastaSelecionada && (
+            <div style={{ marginTop: 14, maxWidth: 480 }}>
+              <div className="op-note" style={{ marginBottom: 10 }}>
+                Pasta selecionada: <b>{pastaSelecionada}</b>
               </div>
-              <input
-                type="file"
-                accept="application/json"
-                onChange={(e) => setFCotacoes(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            <label>
-              <div className="lbl" style={{ marginBottom: 4 }}>
-                contratados_reais.json
-              </div>
-              <input
-                type="file"
-                accept="application/json"
-                onChange={(e) => setFContratados(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            <label>
-              <div className="lbl" style={{ marginBottom: 4 }}>
-                cnpj_to_info.json
-              </div>
-              <input type="file" accept="application/json" onChange={(e) => setFCnpj(e.target.files?.[0] ?? null)} />
-            </label>
-          </div>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
+                <li>{arquivosEncontrados.cotacoes ? "✓" : "✗"} cotacoes_reais.json</li>
+                <li>{arquivosEncontrados.contratados ? "✓" : "✗"} contratados_reais.json</li>
+                <li>{arquivosEncontrados.cnpj ? "✓" : "✗"} cnpj_to_info.json</li>
+              </ul>
+              {faltando.length > 0 && (
+                <div className="status-banner erro" style={{ marginTop: 10 }}>
+                  Não achei {faltando.length === 1 ? "o arquivo" : "os arquivos"} acima marcado(s) com
+                  ✗ dentro dessa pasta — confirme que selecionou a pasta <code>codigo\</code> certa.
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             className="tab-btn"
             style={{ marginTop: 16 }}
-            disabled={!fCotacoes || !fContratados || !fCnpj || fase === "analisando"}
+            disabled={faltando.length > 0 || !pastaSelecionada || fase === "analisando"}
             onClick={analisar}
           >
             {fase === "analisando" ? "Lendo arquivos…" : "Analisar"}
