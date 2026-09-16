@@ -385,3 +385,34 @@ middleware/proxy) — mas nenhuma delas era a causa do que o Mikael via na tela 
 acesso ao painel/log de build da Vercel, não tinha como diferenciar "bug intermitente de
 plataforma" de "build quebrado 100% determinístico" — os dois produzem a mesma tela genérica
 "This page couldn't load" pro usuário final.
+
+## D-31 — Faixa de peso do filtro global corrigida pra [DEC-26]; 2 esquemas de faixa coexistem de propósito
+
+**Decisão/achado (2026-09-16)**: ao validar campo a campo a dimensão `faixaPeso` do motor de
+filtro global contra o Artifact original (v40), `v_cotacao_filtros.faixa_peso` estava usando
+cortes ANTIGOS (10/25/50/100/250/500/1.000 kg, 8 faixas) em vez dos cortes FINAIS de [DEC-26]
+(Mikael, 2026-09-10): 10/20/50/100/250 kg, 6 faixas. Confirmado no dropdown do Artifact
+(`ORD_FAIXA_PESO`) e no Python original (`codigo/enrich_dashboard_data.py::faixa_peso()`, cita
+[DEC-26] no próprio comentário). Corrigido (migration `fix_faixa_peso_alinha_com_dec26`) — afeta
+a dimensão `faixaPeso` em todas as páginas que usam o filtro global.
+
+**Achado importante, NÃO "corrigir"**: o gráfico "Peso x Frete Contratado" e a tabela "Outliers
+de Peso x Frete" (RPCs `financeiro_peso_frete`/`financeiro_outliers_peso`) usam de propósito um
+esquema DIFERENTE — `PESO_BINS` no Artifact original, 8 faixas, os cortes ANTIGOS — coexistindo
+com `ORD_FAIXA_PESO` sem ligação entre os dois (confirmado no JS do próprio Artifact v40). Uma
+primeira tentativa de unificar as 2 functions pros mesmos 6 cortes foi revertida (migration
+`revert_financeiro_peso_frete_outliers_para_8_faixas`) — não são a mesma coisa, sempre
+coexistiram assim no sistema original. `fn_faixa_peso(numeric)` (helper já existente, 6 cortes)
+só é usado pela view `comparacoes`/`/oportunidades` — nem esse é chamado pelas 2 functions do
+parágrafo anterior.
+
+**Aberto, não resolvido**: ao testar `faixaPeso=20–50kg`, os números totais (frete_n/cot) não
+bateram entre o SQL corrigido e o Artifact v40 (776 vs. 1.235 processos), mesmo com os cortes já
+certos — apesar de bater perfeitamente para as outras 5 dimensões já validadas (mês/transportadora/
+região/tipo/esc/janela/romaneio/prazo/cidade). Hipótese mais provável (não confirmada): [DEC-26]
+(faixas) e [DEC-27] (peso considerado = maior entre peso real e peso cubado) foram decididas no
+MESMO DIA pelo Mikael (10/09), e o Artifact v40 (11/09) pode ter recebido só os RÓTULOS de
+[DEC-26] no dropdown sem propagar ainda [DEC-27] pro campo de peso usado ali — o que tornaria o
+SQL atual (`GREATEST(peso_real_kg, peso_cubado_kg)`, já seguindo [DEC-27] à risca) mais correto e
+atualizado que essa versão específica do Artifact, não errado. Não alterado até confirmar com o
+Mikael ou achar uma versão do Artifact posterior a ambas as decisões pra comparar.

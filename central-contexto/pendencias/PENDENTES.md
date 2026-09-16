@@ -3,6 +3,46 @@
 > Tarefas abertas e esperando ação. Última atualização: 2026-09-16.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
 
+## ✅ CORRIGIDO 2026-09-16 — faixa de peso do filtro global não seguia [DEC-26]
+
+Ao validar a dimensão `faixaPeso` do motor de filtro global contra o Artifact
+v40, achado bug real: `v_cotacao_filtros.faixa_peso` usava cortes ANTIGOS
+(10/25/50/100/250/500/1.000 kg, 8 faixas) em vez dos cortes FINAIS de
+[DEC-26] (resposta do Mikael, 2026-09-10): **10/20/50/100/250 kg, 6 faixas**
+(`0–10`/`10–20`/`20–50`/`50–100`/`100–250`/`250+`), confirmados tanto no
+dropdown do Artifact (`ORD_FAIXA_PESO`) quanto no código-fonte Python
+original (`codigo/enrich_dashboard_data.py::faixa_peso()`, comentário cita
+[DEC-26] literalmente). **Corrigido** (migration
+`fix_faixa_peso_alinha_com_dec26`): `v_cotacao_filtros` agora usa os 6 cortes
+certos — afeta a dimensão `faixaPeso` do filtro global em TODAS as páginas
+que a usam (/financeiro, /dados, /operacao, /transportadoras).
+
+**Cuidado, NÃO unificar mais que isso**: o gráfico "Peso x Frete Contratado"
+e a tabela "Outliers de Peso x Frete" (sub-aba "Peso, Cubagem & Custo" de
+/financeiro — RPCs `financeiro_peso_frete`/`financeiro_outliers_peso`) usam
+de propósito um esquema DIFERENTE e mais fino (`PESO_BINS`, 8 faixas, os
+cortes ANTIGOS) — confirmado no próprio JS do Artifact v40, coexistindo com
+`ORD_FAIXA_PESO` sem ligação entre os dois. Tentei unificar essas 2 functions
+pros mesmos 6 cortes numa primeira tentativa e **revertido** (migration
+`revert_financeiro_peso_frete_outliers_para_8_faixas`) depois de achar essa
+distinção no código-fonte — não é bug, são 2 conceitos diferentes que sempre
+coexistiram no sistema original. Cubagem não tem esse problema (só 1 esquema,
+já batia em todo lugar).
+
+**Achado adicional, registrado mas NÃO corrigido** (precisa de mais
+investigação, não é claramente um bug): ao testar `faixaPeso=20–50kg` contra
+o Artifact v40, os NÚMEROS totais (`frete_n`=776 no Supabase vs. 1.235 no
+Artifact; `cot`=1084 vs. 1.543) não bateram, mesmo com os cortes já corretos.
+Hipótese mais provável: [DEC-26] e [DEC-27] ("peso considerado" = maior entre
+peso real e peso cubado) foram decididos no MESMO DIA (10/09) pelo Mikael, e
+o Artifact v40 é de 11/09 — pode ter recebido só os RÓTULOS do DEC-26 no
+dropdown, sem propagar ainda o DEC-27 pro campo de peso usado ali. O SQL
+atual (`v_cotacao_filtros`, `GREATEST(peso_real_kg, peso_cubado_kg)`) já
+segue DEC-27 integralmente — pode estar CERTO e mais atualizado que essa
+versão específica do Artifact, não errado. Não alterado até confirmar com o
+Mikael ou achar uma versão do Artifact posterior a ambas as decisões pra
+comparar. Ver [D-08]/[DEC-27] em LOG_DECISOES.md.
+
 ## ✅ INVESTIGADO 2026-09-16 — issue #1 do GitHub ("Possible exposed API Key"), falso alarme
 
 Bot público (`Leakwatch-Alert-Bot`) abriu a [issue #1](https://github.com/MikaelAntiqueira/-tms-fretes-soma/issues/1)
