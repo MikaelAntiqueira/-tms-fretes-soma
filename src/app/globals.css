@@ -1193,12 +1193,24 @@ main.content.vg-main { padding: 14px 28px 18px; }
    rolar pra cima de novo. Agora o modal é uma coluna flex de altura fixa:
    cabeçalho e subtítulo (.vg-modal-head/.vg-modal-sub) ficam sempre
    visíveis, e só a lista de clientes (.vg-modal-body, que envolve a
-   .table-scroll em VisaoGeralCard.tsx) rola internamente. */
+   .table-scroll em VisaoGeralCard.tsx) rola internamente.
+
+   [2026-09-17, 2º ajuste] Com a coluna de nota fiscal a mais, a tabela
+   (5 colunas, `table.data td` com white-space:nowrap por padrão) passou a
+   sempre precisar de barra de rolagem horizontal também — Mikael pediu
+   pra alargar o modal e evitar as duas barras. Modal mais largo
+   (min(820px, 92vw)) e, só dentro dele, Cliente/Cidade/Notas quebram
+   linha em vez de nowrap (as colunas numéricas continuam alinhadas à
+   direita sem quebrar). Ainda pode sobrar rolagem vertical em recortes
+   com muitos clientes — isso é esperado, não dá pra caber 21+ linhas
+   inteiras na tela sem rolar. */
 .vg-modal-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.vg-modal { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 20px 26px 18px; max-width: 640px; width: 100%; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; }
+.vg-modal { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 20px 26px 18px; max-width: min(820px, 92vw); width: 100%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
 .vg-modal-head { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .vg-modal-head h3 { font-size: 16px; font-weight: 800; }
 .vg-modal-close { all: unset; cursor: pointer; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 4px; }
 .vg-modal-close:hover { color: var(--text-primary); }
 .vg-modal-sub { flex: none; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; }
 .vg-modal-body { flex: 1; overflow-y: auto; min-height: 0; }
+.vg-modal-body table.data th, .vg-modal-body table.data td { white-space: normal; }
+.vg-modal-body table.data td.num { white-space: nowrap; }
