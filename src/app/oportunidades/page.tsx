@@ -21,6 +21,20 @@ import { parseMulti, clsDifSobreFrete, fmtBRL, fmtNum, fmtPct } from "@/lib/form
 // RPC de conveniência (fn_oportunidades_...) AINDA NÃO FORAM CRIADAS — a
 // página consulta a view diretamente via PostgREST (supabase.from) com os
 // mesmos filtros de URL que /financeiro e /transportadoras usam.
+//
+// [FIX 2026-09-17] Dois achados ao trabalhar no motor de filtro desta
+// página, nenhum deles pedido originalmente: (1) a busca não paginava —
+// `comparacoes` tem 5.194 linhas, acima do "Max Rows" da API do Supabase
+// (1000) — cortava silenciosamente em 1.000 e reportava isso como cobertura
+// real ("14,5% da base" em vez de 75,1%); corrigido com paginação em lotes.
+// (2) as opções dos dropdowns (mês/região/tipo) derivavam do resultado JÁ
+// FILTRADO, então ativar um filtro colapsava o PRÓPRIO dropdown daquela
+// dimensão pro único valor selecionado — corrigido com cascata real
+// (passaFiltros(), cada dimensão exclui a si mesma), mesma regra de
+// financeiro_filtro_opcoes_cascata() só que em JS (esta página usa
+// `data_contratacao`, não `v_cotacao_filtros.mes` — semânticas diferentes,
+// não dá pra só reaproveitar a RPC aqui sem também mudar o que "mês"
+// significa nesta página).
 // ============================================================================
 
 const TRANSP_ORDER = [
@@ -83,12 +97,52 @@ export interface ComparacaoRow {
 // ---------------------------------------------------------------------------
 // Server-side: busca dados da view comparacoes via PostgREST
 // ---------------------------------------------------------------------------
-async function fetchComparacoes(filtros: {
+type FiltrosOportunidades = {
   meses: string[] | null;
   transportadoras: string[] | null;
   regioes: string[] | null;
   tipos: string[] | null;
-}): Promise<{ rows: ComparacaoRow[]; totalCotacoes: number }> {
+};
+
+// [FIX 2026-09-17] Cascata de opções — antes os 3 dropdowns dinâmicos (mês/
+// região/tipo) derivavam suas opções do resultado JÁ FILTRADO (`rows`),
+// então ativar um filtro fazia o PRÓPRIO dropdown daquela dimensão
+// "colapsar" pra só o valor selecionado (impossível trocar de região sem
+// antes limpar o filtro de região) — bug real, não cascata de verdade.
+// Cascata correta: cada dimensão calcula suas opções aplicando as OUTRAS 3
+// dimensões, nunca a si mesma — mesma regra de financeiro_filtro_opcoes_
+// cascata() (reaproveitada em /financeiro, /operacao, /transportadoras),
+// replicada aqui em JS porque esta página filtra client-side (ver comentário
+// abaixo) sobre `data_contratacao`, não `v_cotacao_filtros.mes` (a RPC usa a
+// data de CRIAÇÃO da cotação — semântica diferente da usada aqui).
+function passaFiltros(
+  row: Record<string, unknown>,
+  filtros: FiltrosOportunidades,
+  excluir: keyof FiltrosOportunidades | null
+): boolean {
+  if (excluir !== "meses" && filtros.meses && filtros.meses.length > 0) {
+    const dc = row.data_contratacao as string | null | undefined;
+    if (dc == null || dc === "" || !filtros.meses.some((m) => dc.startsWith(m))) return false;
+  }
+  if (excluir !== "transportadoras" && filtros.transportadoras && filtros.transportadoras.length > 0) {
+    if (!filtros.transportadoras.includes(row.transportadora_contratada as string)) return false;
+  }
+  if (excluir !== "regioes" && filtros.regioes && filtros.regioes.length > 0) {
+    if (!filtros.regioes.includes(row.regiao_normalizada as string)) return false;
+  }
+  if (excluir !== "tipos" && filtros.tipos && filtros.tipos.length > 0) {
+    if (!filtros.tipos.includes(row.tipo_cliente as string)) return false;
+  }
+  return true;
+}
+
+async function fetchComparacoes(filtros: FiltrosOportunidades): Promise<{
+  rows: ComparacaoRow[];
+  totalCotacoes: number;
+  opcoesMeses: string[];
+  opcoesRegioes: string[];
+  opcoesTipos: string[];
+}> {
   const supabase = await createSupabaseServerClient();
 
   // [FIX 2026-09-17] `comparacoes` tem 5.194 linhas — acima do "Max Rows" da
@@ -125,33 +179,28 @@ async function fetchComparacoes(filtros: {
   // então filtramos manualmente no cliente com as mesmas condições). Cada
   // dimensão é OU dentro de si e AND entre dimensões — mesma convenção do
   // FilterBar em todas as outras páginas.
-  const algumFiltroAtivo =
-    (filtros.meses?.length ?? 0) > 0 ||
-    (filtros.transportadoras?.length ?? 0) > 0 ||
-    (filtros.regioes?.length ?? 0) > 0 ||
-    (filtros.tipos?.length ?? 0) > 0;
-  let filtered = allRows;
-  if (algumFiltroAtivo) {
-    filtered = filtered.filter((row) => {
-      // data_contratacao~\"2026-07\" → começa com o mês (proteção contra null)
-      if (filtros.meses && filtros.meses.length > 0) {
-        const dc = row.data_contratacao as string | null | undefined;
-        if (dc == null || dc === "") return false;
-        const mesMatch = filtros.meses.some((m) => dc.startsWith(m));
-        if (!mesMatch) return false;
-      }
-      if (filtros.transportadoras && filtros.transportadoras.length > 0) {
-        if (!filtros.transportadoras.includes(row.transportadora_contratada as string)) return false;
-      }
-      if (filtros.regioes && filtros.regioes.length > 0) {
-        if (!filtros.regioes.includes(row.regiao_normalizada as string)) return false;
-      }
-      if (filtros.tipos && filtros.tipos.length > 0) {
-        if (!filtros.tipos.includes(row.tipo_cliente as string)) return false;
-      }
-      return true;
-    });
-  }
+  const filtered = allRows.filter((row) => passaFiltros(row, filtros, null));
+
+  // Opções dos dropdowns com cascata real (ver passaFiltros acima) — cada
+  // dimensão exclui a si mesma do filtro aplicado antes de listar valores.
+  const opcoesMeses = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "meses"))
+      .map((row) => (row.data_contratacao as string | null)?.slice(0, 7))
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesRegioes = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "regioes"))
+      .map((row) => row.regiao_normalizada as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesTipos = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "tipos"))
+      .map((row) => row.tipo_cliente as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
 
   const rows: ComparacaoRow[] = filtered.map((r) => ({
     contratacao_id:            String(r.contratacao_id ?? ""),
@@ -181,7 +230,7 @@ async function fetchComparacoes(filtros: {
     oportunidade_prazo:        Boolean(r.oportunidade_prazo),
   }));
 
-  return { rows, totalCotacoes: totalCotacoes ?? 0 };
+  return { rows, totalCotacoes: totalCotacoes ?? 0, opcoesMeses, opcoesRegioes, opcoesTipos };
 }
 
 // ---------------------------------------------------------------------------
@@ -207,12 +256,18 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
 
   let rows: ComparacaoRow[] = [];
   let totalCotacoes = 0;
+  let opcoesMesesCascata: string[] = [];
+  let opcoesRegioesCascata: string[] = [];
+  let opcoesTiposCascata: string[] = [];
   let erro: string | null = null;
 
   try {
     const result = await fetchComparacoes(filtros);
     rows = result.rows;
     totalCotacoes = result.totalCotacoes;
+    opcoesMesesCascata = result.opcoesMeses;
+    opcoesRegioesCascata = result.opcoesRegioes;
+    opcoesTiposCascata = result.opcoesTipos;
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
@@ -262,25 +317,15 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
     ? escolheuBarata / (escolheuBarata + naoEscolheuBarata)
     : null;
 
-  // Dados para filtros dinâmicos — meses vêm dos próprios dados.
-  const opcoesMes = [...new Set(rows.map((r) => {
-    const [y, m] = r.data_contratacao.split("-");
-    return `${y}-${m}`;
-  }))].sort();
-  const opcoesRegioes = [...new Set(rows.map((r) => r.regiao_normalizada))].sort();
-  // [FIX 2026-09-16] Antes era um array fixo ["Público", "Privado", "Grupo"] (COM acento) —
-  // mas clientes.tipo_cliente armazena "Publico" (SEM acento); filtrar por "Público" nunca
-  // batia com nenhuma linha. Mesmo bug de acento existia na view `comparacoes` (classif caía
-  // em "alerta" pra todo cliente Publico — corrigido em paralelo, migration
-  // fix_comparacoes_classif_acento_publico). Agora deriva das próprias linhas, como
-  // mes/regiao acima — nunca mais diverge do valor real.
-  const opcoesTipos = [...new Set(rows.map((r) => r.tipo_cliente))].sort();
-
+  // Opções dos dropdowns com cascata real (calculadas em fetchComparacoes,
+  // sobre TODAS as linhas — não sobre `rows`, que já está filtrado; ver
+  // [FIX 2026-09-17] e passaFiltros() lá). [FIX 2026-09-16, ainda válido]:
+  // tipo_cliente é "Publico" sem acento no banco — nunca hardcode "Público".
   const filterDimensions: FilterDimension[] = [
-    { param: "mes", labelAll: "Todos os meses", options: opcoesMes, format: "mes" },
+    { param: "mes", labelAll: "Todos os meses", options: opcoesMesesCascata, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
-    { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
-    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+    { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioesCascata },
+    { param: "tipo", labelAll: "Todos os tipos", options: opcoesTiposCascata },
   ];
 
   // Dados das abas (hidratados client-side via state)

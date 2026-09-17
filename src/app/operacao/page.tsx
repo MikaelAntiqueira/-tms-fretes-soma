@@ -128,6 +128,22 @@ import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 // '2026-08')` == Meio-dia 276/R$13.685,36, Tarde 1.282/R$138.451,23 —
 // idêntico a `select ... from v_operacao_base where cotacao_id in (select
 // cotacao_id from v_cotacao_filtros where mes='2026-08')` direto em SQL.
+//
+// ATUALIZAÇÃO (2026-09-17): os parágrafos acima descrevem o escopo ORIGINAL
+// (só "Meio-dia × Tarde" reage, só 4 dimensões) — mantidos como histórico.
+// Desde então: `operacao_por_janela()` já tinha ganho as 11 dimensões de
+// graça (reaproveitada por /financeiro); `operacao_dashboard_estatico()`
+// ganhou as mesmas 11 (migration `fn_operacao_dashboard_estatico_add_
+// filtro_global_11_dimensoes`) — como ela também gera `janela_carriers`
+// (o "top 3 transportadoras" por janela), a "LIMITAÇÃO ADICIONAL" acima
+// (`operacao_por_janela_transportadora` sem filtro) deixou de existir
+// junto: essa function antiga nunca foi usada pelo card, só a
+// deprecated/mantida por regressão (ver [FIX 2026-09-14]). `filtro_opcoes_
+// mes()`/`financeiro_filtro_opcoes()` saíram de uso — as opções dos 11
+// dropdowns (com cascata real) vêm de `financeiro_filtro_opcoes_cascata()`
+// (mesma RPC de /financeiro e /transportadoras). `<FilterBar>` subiu pro
+// topo da página (era só dentro de "Meio-dia × Tarde"). Todas as seções
+// reagem ao filtro agora.
 export const dynamic = "force-dynamic";
 
 const CARRIER_COLOR: Record<string, string> = {
@@ -206,15 +222,31 @@ interface OperacaoData {
   opcoesMeses: string[];
   opcoesRegioes: string[];
   opcoesTipos: string[];
+  opcoesRomaneios: string[];
+  opcoesEsc: string[];
+  opcoesPrazos: number[];
+  opcoesCidades: string[];
+  opcoesJanelas: string[];
+  opcoesFaixasPeso: string[];
+  opcoesFaixasCubagem: string[];
 }
 
-// Filtros da Fase 1 do motor de filtro global — mesma convenção de
-// src/app/financeiro/page.tsx (`null` numa dimensão = sem filtro nela).
+// Filtros do motor de filtro global — as 11 dimensões completas (upgrade
+// 2026-09-17, mesma convenção de src/app/financeiro/page.tsx; `null` numa
+// dimensão = sem filtro nela). `prazos` fica number[] (não string[]) porque
+// a coluna/param SQL são int[].
 interface FiltrosOperacao {
   meses: string[] | null;
   transportadoras: string[] | null;
   regioes: string[] | null;
   tipos: string[] | null;
+  romaneios: string[] | null;
+  esc: string[] | null;
+  prazos: number[] | null;
+  cidades: string[] | null;
+  janelas: string[] | null;
+  faixasPeso: string[] | null;
+  faixasCubagem: string[] | null;
 }
 
 // Shape do jsonb retornado por operacao_dashboard_estatico() — ver
@@ -228,26 +260,40 @@ interface DashboardEstatico {
 
 async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> {
   const supabase = await createSupabaseServerClient();
+  // [2026-09-17] Upgrade pras 11 dimensões completas — `operacao_por_janela`
+  // já tinha os 11 parâmetros (ganhou de graça quando /financeiro passou a
+  // reaproveitá-la, migration fn_filtro_global_fase1_7_dimensoes_restantes).
+  // Só faltava `operacao_dashboard_estatico` (migration
+  // fn_operacao_dashboard_estatico_add_filtro_global_11_dimensoes) — mantém
+  // a mesma estrutura de 1 RPC só materializando v_operacao_base (ver [FIX
+  // 2026-09-14] no topo do arquivo), não reintroduz o timeout do D-26.
   const filtroArgs = {
     p_meses: filtros.meses,
     p_transportadoras: filtros.transportadoras,
     p_regioes: filtros.regioes,
     p_tipos: filtros.tipos,
+    p_romaneios: filtros.romaneios,
+    p_esc: filtros.esc,
+    p_prazos: filtros.prazos,
+    p_cidades: filtros.cidades,
+    p_janelas: filtros.janelas,
+    p_faixas_peso: filtros.faixasPeso,
+    p_faixas_cubagem: filtros.faixasCubagem,
   };
 
-  const [dashRes, janelasRes, mesesRes, opcoesRes] = await Promise.all([
+  const [dashRes, janelasRes, opcoesRes] = await Promise.all([
     // ---- [FIX 2026-09-14] 1 RPC só para as 4 agregações estáticas (antes
     // eram operacao_kpis + operacao_por_transportadora + operacao_por_
     // janela_transportadora + operacao_por_cidade, cada uma recomputando
     // v_operacao_base do zero — ver comentário no topo do arquivo) ----
-    supabase.rpc("operacao_dashboard_estatico"),
-    // ---- única RPC desta página que já tem os 4 parâmetros — reage ao filtro ----
+    supabase.rpc("operacao_dashboard_estatico", filtroArgs),
     supabase.rpc("operacao_por_janela", filtroArgs),
-    // ---- opções completas (sem cascata) para os dropdowns do FilterBar ----
-    supabase.rpc("filtro_opcoes_mes"),
-    supabase.rpc("financeiro_filtro_opcoes"),
+    // ---- cascata real pras 11 dimensões (reaproveita a RPC de /financeiro,
+    // page-agnostic — só lê v_cotacao_filtros) — Transportadora continua
+    // TRANSP_ORDER (fixo, também usado em CARRIER_COLOR nesta página) ----
+    supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
   ]);
-  for (const res of [dashRes, janelasRes, mesesRes, opcoesRes]) {
+  for (const res of [dashRes, janelasRes, opcoesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -305,12 +351,23 @@ async function getOperacaoData(filtros: FiltrosOperacao): Promise<OperacaoData> 
     cidade_total_frete: Number(r.cidade_total_frete ?? 0),
   }));
 
-  const opcoesMeses: string[] = ((mesesRes.data as Record<string, unknown>[])?.[0]?.meses as string[] | null) ?? [];
   const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+  const opcoesMeses: string[] = (opcoesRow?.meses as string[] | null) ?? [];
   const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
   const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
+  const opcoesRomaneios: string[] = (opcoesRow?.romaneios as string[] | null) ?? [];
+  const opcoesEsc: string[] = (opcoesRow?.escs as string[] | null) ?? [];
+  const opcoesPrazos: number[] = ((opcoesRow?.prazos as string[] | null) ?? []).map(Number);
+  const opcoesCidades: string[] = (opcoesRow?.cidades as string[] | null) ?? [];
+  const opcoesJanelas: string[] = (opcoesRow?.janelas as string[] | null) ?? [];
+  const opcoesFaixasPeso: string[] = (opcoesRow?.faixas_peso as string[] | null) ?? [];
+  const opcoesFaixasCubagem: string[] = (opcoesRow?.faixas_cubagem as string[] | null) ?? [];
 
-  return { kpis, carriers, janelas, janelaCarriers, cidades, opcoesMeses, opcoesRegioes, opcoesTipos };
+  return {
+    kpis, carriers, janelas, janelaCarriers, cidades,
+    opcoesMeses, opcoesRegioes, opcoesTipos, opcoesRomaneios, opcoesEsc,
+    opcoesPrazos, opcoesCidades, opcoesJanelas, opcoesFaixasPeso, opcoesFaixasCubagem,
+  };
 }
 
 import { fmtBRL, fmtBRLSigned, fmtNum, fmtPct, parseMulti, clsDifSobreFrete } from "@/lib/format";
@@ -333,13 +390,21 @@ export default async function OperacaoPage({
   // src/lib/supabase-server.ts.
   await requireUser("/operacao");
   const sp = await searchParams;
+  const prazosParam = parseMulti(sp.prazo);
   const filtros: FiltrosOperacao = {
     meses: parseMulti(sp.mes),
     transportadoras: parseMulti(sp.transportadora),
     regioes: parseMulti(sp.regiao),
     tipos: parseMulti(sp.tipo),
+    romaneios: parseMulti(sp.romaneio),
+    esc: parseMulti(sp.esc),
+    prazos: prazosParam ? prazosParam.map(Number) : null,
+    cidades: parseMulti(sp.cidade),
+    janelas: parseMulti(sp.janela),
+    faixasPeso: parseMulti(sp.faixaPeso),
+    faixasCubagem: parseMulti(sp.faixaCubagem),
   };
-  const filtroAtivo = Boolean(filtros.meses || filtros.transportadoras || filtros.regioes || filtros.tipos);
+  const filtroAtivo = Object.values(filtros).some((v) => v != null);
 
   let data: OperacaoData | null = null;
   let erro: string | null = null;
@@ -357,12 +422,26 @@ export default async function OperacaoPage({
   const opcoesMeses = data?.opcoesMeses ?? [];
   const opcoesRegioes = data?.opcoesRegioes ?? [];
   const opcoesTipos = data?.opcoesTipos ?? [];
+  const opcoesRomaneios = data?.opcoesRomaneios ?? [];
+  const opcoesEsc = data?.opcoesEsc ?? [];
+  const opcoesPrazos = data?.opcoesPrazos ?? [];
+  const opcoesCidades = data?.opcoesCidades ?? [];
+  const opcoesJanelas = data?.opcoesJanelas ?? [];
+  const opcoesFaixasPeso = data?.opcoesFaixasPeso ?? [];
+  const opcoesFaixasCubagem = data?.opcoesFaixasCubagem ?? [];
 
   const filterDimensions: FilterDimension[] = [
     { param: "mes", labelAll: "Todos os meses", options: opcoesMeses, format: "mes" },
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioes },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTipos },
+    { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: "esc" },
+    { param: "prazo", labelAll: "Todos os prazos", options: opcoesPrazos.map(String), format: "prazo" },
+    { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
+    { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelas },
+    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: opcoesFaixasPeso },
+    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: opcoesFaixasCubagem },
   ];
 
   const kpiTiles: [string, string, string][] = kpis
@@ -410,10 +489,8 @@ export default async function OperacaoPage({
             <h1>Operação — Controle Operacional de Carregamento</h1>
             <p>
               Quem está carregando, quando (Meio-dia × Tarde) e em quais cidades — agregado sobre{" "}
-              <b>toda a base de contratações cruzadas a uma cotação</b>. A seção &quot;Meio-dia ×
-              Tarde&quot; já aceita os filtros de Mês, Transportadora Contratada, Região Comercial e
-              Tipo Cliente (Fase 1 do motor de filtro global); as demais seções desta página ainda
-              mostram sempre a base completa, sem filtro.
+              <b>toda a base de contratações cruzadas a uma cotação</b>. Todas as seções já aceitam as
+              11 dimensões do motor de filtro global, com cascata de opções nos dropdowns.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
@@ -433,7 +510,17 @@ export default async function OperacaoPage({
           <div className="status-banner">Sem contratações cruzadas a uma cotação nos dados atuais.</div>
         ) : (
           <>
-            <section className="bloc" style={{ marginTop: 0 }}>
+            {/* Motor de filtro global — upgrade 2026-09-17: todas as seções
+                desta página já reagem às 11 dimensões (KPIs, Quem está
+                carregando, Distribuição, Meio-dia × Tarde incl. "top 3" por
+                janela, Cidade × Transportadora) — por isso fica no topo,
+                único pra página inteira, em vez de só dentro de "Meio-dia ×
+                Tarde" como antes. */}
+            <Suspense fallback={<div className="filterbar" />}>
+              <FilterBar dimensions={filterDimensions} />
+            </Suspense>
+
+            <section className="bloc" style={{ marginTop: 16 }}>
               <div className="op-note" style={{ marginBottom: 16 }}>
                 Toda a base cruzada &middot; <b>{fmtNum(kpis.n_pedidos)}</b> pedidos &middot;{" "}
                 <b>{fmtNum(kpis.n_romaneios)}</b> romaneios &middot; <b>{fmtBRL(kpis.soma_frete_contratado)}</b>{" "}
@@ -501,15 +588,14 @@ export default async function OperacaoPage({
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
                 &quot;Frete mín.&quot; = piso OBSERVADO na base (ESTIMATIVA estatística, não a tabela oficial da
                 transportadora — ver <code>docs/frete-minimo-observado-2026-09.md</code>). Sem selo &quot;·
-                obs.&quot; = sem parâmetro disponível ainda. Esta tabela mostra sempre a base completa (não
-                reage ao filtro abaixo).
+                obs.&quot; = sem parâmetro disponível ainda.
               </div>
             </section>
 
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Distribuição do frete contratado</h2>
-                <div className="desc">participação de cada transportadora no total contratado (toda a base cruzada, sem filtro)</div>
+                <div className="desc">participação de cada transportadora no total contratado &middot; reage ao filtro acima</div>
               </div>
               <div className="card">
                 <div className="dist-bar">
@@ -547,26 +633,11 @@ export default async function OperacaoPage({
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Meio-dia × Tarde</h2>
-                <div className="desc">
-                  janela de contratação, agrupada em 2 baldes fixos &middot; [TASK-29] motor de filtro global —
-                  única seção desta página que reage aos filtros abaixo (ver comentário no topo do arquivo)
-                </div>
+                <div className="desc">janela de contratação, agrupada em 2 baldes fixos &middot; reage ao filtro acima</div>
               </div>
-              {/* Motor de filtro global — Fase 1, continuação /operacao. Fica
-                  só dentro desta seção de propósito: é a única RPC desta
-                  página (operacao_por_janela) que já suporta os 4 parâmetros
-                  — colocar o filtro fora daqui sugeriria que "Quem está
-                  carregando"/"Distribuição"/"Cidade × Transportadora"
-                  também reagem, o que ainda não é verdade. */}
-              <Suspense fallback={<div className="filterbar" />}>
-                <FilterBar dimensions={filterDimensions} />
-              </Suspense>
               {filtroAtivo && (
-                <div className="cov-note">
-                  Os 5 números de cada card abaixo (contratações/romaneios/pedidos/peso/cubagem/frete) já
-                  refletem o filtro acima. O &quot;top 3 transportadoras&quot; dentro de cada card ainda mostra a
-                  distribuição da <b>base completa</b> daquela janela (a function que alimenta o ranking ainda
-                  não tem os 4 parâmetros do filtro) — próxima etapa, não bug.
+                <div className="cov-note ok">
+                  Os 5 números de cada card e o &quot;top 3 transportadoras&quot; já refletem o filtro acima.
                 </div>
               )}
               <div className="grid cols-auto">
@@ -651,7 +722,7 @@ export default async function OperacaoPage({
               <div className="bloc-head">
                 <h2>Cidade × Transportadora</h2>
                 <div className="desc">
-                  top 15 cidades por frete contratado total (toda a base, sem filtro) &middot; cor da diferença
+                  top 15 cidades por frete contratado total (reage ao filtro acima) &middot; cor da diferença
                   classifica a magnitude sobre o frete da própria linha, não julga a decisão
                 </div>
               </div>

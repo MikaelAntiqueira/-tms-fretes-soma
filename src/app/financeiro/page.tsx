@@ -1055,19 +1055,12 @@ export default async function FinanceiroPage({
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
                       <li className="notes">
-                        <span className="name">Motor de filtro — cascata em outras páginas</span>
+                        <span className="name">Motor de filtro — /oportunidades com só 4 das 11 dimensões</span>
                         <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          já funciona aqui em /financeiro (financeiro_filtro_opcoes_cascata); /operacao,
-                          /transportadoras e /oportunidades ainda mostram a lista completa de valores nos
-                          dropdowns, não podada pelos outros filtros ativos
-                        </span>
-                      </li>
-                      <li className="notes">
-                        <span className="name">/oportunidades — bug de cobertura corrigido (2026-09-17)</span>
-                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          buscava só as 1.000 primeiras linhas de `comparacoes` (limite da API) e reportava
-                          isso como 14,5% da base, quando o real é 5.194 linhas (75,1%) — corrigido com
-                          paginação; o filtro em si já funcionava
+                          já tem cascata real e filtro funcionando (Mês/Transportadora/Região/Tipo); as
+                          outras 7 dimensões não foram estendidas pra cá ainda porque esta página filtra
+                          por `data_contratacao`, não `v_cotacao_filtros.mes` como as demais páginas — a
+                          semântica de "mês" precisaria ser decidida antes de unificar
                         </span>
                       </li>
                     </ul>
