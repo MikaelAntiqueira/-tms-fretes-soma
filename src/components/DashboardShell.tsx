@@ -29,9 +29,16 @@
 // <nav>, depois de `.sidebar-nav` — componente isolado (ver
 // src/components/SessionIndicator.tsx) para manter esta edição mínima,
 // já que este arquivo também pode ser tocado por outro fluxo de trabalho em
-// paralelo (motor de filtro global). Puramente informativo: "Visitante" sem
-// sessão, e-mail + "Sair" com sessão ativa — não bloqueia nem redireciona
-// ninguém.
+// paralelo (motor de filtro global). Puramente informativo: "Visitante"
+// sem sessão, e-mail + "Sair" com sessão ativa — não bloqueia nem
+// redireciona ninguém.
+//
+// Label do item /ontem (2026-09-17, a pedido do Mikael): "Hoje" e "Ontem"
+// (nome antigo, herdado do Artifact) descrevem mal um conteúdo que hoje tem
+// seletor de dia — o usuário pode escolher qualquer data. "Resumo do Dia"
+// vale pra qualquer dia exibido, e fica igual ao título da própria página
+// (ver src/app/ontem/page.tsx). A rota continua `/ontem` de propósito (não
+// é uma mudança de escopo pedida, e trocar a URL quebraria links salvos).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -63,8 +70,8 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/ontem",
-    label: "Hoje",
-    title: "Hoje — decisões de contratação do último dia fechado",
+    label: "Resumo do Dia",
+    title: "Resumo do Dia — decisões de contratação do último dia fechado",
     icon: (
       <svg viewBox="0 0 24 24" {...ICON_STROKE}>
         <rect x="3.5" y="4.5" width="17" height="16" rx="2" />
