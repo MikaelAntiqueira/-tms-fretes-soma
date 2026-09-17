@@ -140,6 +140,21 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // migration `fn_filtro_global_fase1_remove_overloads_zero_arg`. Lição para
 // quem tocar essas functions de novo: nunca deixe 2 overloads coexistindo.
 //
+// ATUALIZAÇÃO (2026-09-17): o parágrafo "FASE 1" acima descreve o escopo
+// ORIGINAL (só 4 dimensões, só Visão Geral, sem cascata) — mantido como
+// histórico, não como estado atual. Desde então: as 7 dimensões restantes
+// foram completadas (`fn_filtro_global_fase1_7_dimensoes_restantes`), a
+// cascata de opções foi implementada (`financeiro_filtro_opcoes_cascata`,
+// ver FilterBar.tsx) e as 3 sub-abas restantes ("Cotado × Contratado",
+// "Padrões da Diferença", "Peso, Cubagem & Custo") passaram a reagir ao
+// filtro (migration `fn_financeiro_add_filtro_global_padroes_
+// pesocustagem_cotadocontratado`) — <FilterBar> subiu pra fora de
+// <FinanceiroTabs>, único pras 4 sub-abas, em vez de só dentro de
+// "fin-visao". Ainda fora: cascata de opções em /operacao,
+// /transportadoras e /oportunidades; e a própria /oportunidades ainda não
+// aplica o filtro na consulta (só decorativo) — ver card "Pendências desta
+// etapa" na sub-aba Visão Geral.
+//
 // Nota sobre a "cobertura estrutural" (covNote, mais abaixo): os campos
 // `total_contratacoes`/`contratacoes_cruzadas` de `financeiro_visao_geral_
 // kpis()` são DELIBERADAMENTE não afetados pelo filtro (sempre a base
@@ -375,17 +390,20 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     // isso recebe o filtroArgs completo (a function ignora internamente o
     // parâmetro da própria dimensão de cada lista que calcula).
     supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
-    // ---- demais sub-abas: FORA do escopo desta Fase 1, sempre base completa ----
-    supabase.rpc("financeiro_evolucao_mensal"),
-    supabase.rpc("financeiro_diff_n_esc_nao"),
-    supabase.rpc("financeiro_diff_por_prazo"),
-    supabase.rpc("financeiro_diff_por_regiao"),
-    supabase.rpc("financeiro_diff_por_transportadora"),
-    supabase.rpc("financeiro_diff_por_tipo_cliente"),
-    supabase.rpc("financeiro_peso_frete"),
-    supabase.rpc("financeiro_outliers_peso"),
-    supabase.rpc("financeiro_prazo_frete_medio"),
-    supabase.rpc("financeiro_cubagem_custo"),
+    // ---- demais sub-abas ("Cotado × Contratado", "Padrões da Diferença",
+    // "Peso, Cubagem & Custo") — ligadas ao filtro global em 2026-09-17
+    // (migration fn_financeiro_add_filtro_global_padroes_pesocustagem_
+    // cotadocontratado), mesmo padrão das 4 RPCs da Visão Geral acima ----
+    supabase.rpc("financeiro_evolucao_mensal", filtroArgs),
+    supabase.rpc("financeiro_diff_n_esc_nao", filtroArgs),
+    supabase.rpc("financeiro_diff_por_prazo", filtroArgs),
+    supabase.rpc("financeiro_diff_por_regiao", filtroArgs),
+    supabase.rpc("financeiro_diff_por_transportadora", filtroArgs),
+    supabase.rpc("financeiro_diff_por_tipo_cliente", filtroArgs),
+    supabase.rpc("financeiro_peso_frete", filtroArgs),
+    supabase.rpc("financeiro_outliers_peso", filtroArgs),
+    supabase.rpc("financeiro_prazo_frete_medio", filtroArgs),
+    supabase.rpc("financeiro_cubagem_custo", filtroArgs),
     // ---- Simulação de Custo por Transportadora (4º bloco Visão Geral) —
     // reage ao filtro; a própria function só devolve linhas com exatamente
     // 1 transportadora filtrada (ver migration fn_financeiro_simulacao_custo).
@@ -797,11 +815,10 @@ export default async function FinanceiroPage({
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Financeiro</h1>
             <p>
-              KPIs executivos, evolução mensal e decisões de contratação. A sub-aba <b>Visão Geral</b>{" "}
-              já aceita as 11 dimensões do motor de filtro global (Mês, Transportadora Contratada,
-              Região Comercial, Tipo Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela,
-              Faixa de Peso, Faixa de Cubagem); as demais 3 sub-abas ainda mostram sempre a base
-              completa, sem filtro.
+              KPIs executivos, evolução mensal e decisões de contratação. As 4 sub-abas já aceitam as
+              11 dimensões do motor de filtro global (Mês, Transportadora Contratada, Região
+              Comercial, Tipo Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa
+              de Peso, Faixa de Cubagem).
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
@@ -821,27 +838,26 @@ export default async function FinanceiroPage({
         ) : !k ? (
           <div className="status-banner">Sem dados na base atual (confira se o filtro ativo não zerou o recorte).</div>
         ) : (
-          <FinanceiroTabs
-            tabs={[
-              { id: "fin-visao", label: "Visão Geral" },
-              { id: "fin-cotado", label: "Cotado × Contratado" },
-              { id: "fin-padroes", label: "Padrões da Diferença" },
-              { id: "fin-peso", label: "Peso, Cubagem & Custo" },
-            ]}
-            defaultTab="fin-visao"
-          >
-            <div className="subpage" data-subpage="fin-visao">
-              {/* Motor de filtro global — Fase 1. Escopo/limitações completos
-                  no comentário do topo deste arquivo e em FilterBar.tsx. Fica
-                  só dentro desta sub-aba de propósito: é a única que reage ao
-                  filtro nesta etapa — colocá-lo fora daqui (ex. acima das
-                  abas) sugeriria que "Cotado × Contratado"/"Padrões da
-                  Diferença"/"Peso, Cubagem & Custo" também reagem, o que
-                  ainda não é verdade. */}
-              <Suspense fallback={<div className="filterbar" />}>
-                <FilterBar dimensions={filterDimensions} />
-              </Suspense>
+          <>
+            {/* Motor de filtro global — agora as 4 sub-abas reagem a ele
+                (2026-09-17, ver migration fn_financeiro_add_filtro_global_
+                padroes_pesocustagem_cotadocontratado) — por isso fica ACIMA
+                das abas, único pra todas, em vez de duplicado dentro de
+                "fin-visao" como antes. */}
+            <Suspense fallback={<div className="filterbar" />}>
+              <FilterBar dimensions={filterDimensions} />
+            </Suspense>
 
+            <FinanceiroTabs
+              tabs={[
+                { id: "fin-visao", label: "Visão Geral" },
+                { id: "fin-cotado", label: "Cotado × Contratado" },
+                { id: "fin-padroes", label: "Padrões da Diferença" },
+                { id: "fin-peso", label: "Peso, Cubagem & Custo" },
+              ]}
+              defaultTab="fin-visao"
+            >
+            <div className="subpage" data-subpage="fin-visao">
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>KPIs executivos</h2>
@@ -1039,24 +1055,18 @@ export default async function FinanceiroPage({
                   <div className="alert-card info" style={{ marginTop: 8 }}>
                     <ul>
                       <li className="notes">
-                        <span className="name">Simulação de Custo por Transportadora</span>
+                        <span className="name">Motor de filtro — cascata em outras páginas</span>
                         <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          fora de propósito nesta etapa — regra &quot;nunca estima, sempre real, operação a
-                          operação&quot; merece validação própria, com mais tempo
+                          já funciona aqui em /financeiro (financeiro_filtro_opcoes_cascata); /operacao,
+                          /transportadoras e /oportunidades ainda mostram a lista completa de valores nos
+                          dropdowns, não podada pelos outros filtros ativos
                         </span>
                       </li>
                       <li className="notes">
-                        <span className="name">Motor de filtro — cascata de opções</span>
+                        <span className="name">Motor de filtro — /oportunidades</span>
                         <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          os dropdowns ainda mostram sempre a lista completa de valores, não podada pelos
-                          outros filtros ativos (ver FilterBar.tsx)
-                        </span>
-                      </li>
-                      <li className="notes">
-                        <span className="name">Motor de filtro — demais sub-abas/páginas</span>
-                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          &quot;Cotado × Contratado&quot;/&quot;Padrões da Diferença&quot;/&quot;Peso, Cubagem
-                          &amp; Custo&quot; e as demais 4 páginas do dashboard ainda não reagem ao filtro
+                          os dropdowns do filtro aparecem na página, mas a consulta em si (view
+                          `comparacoes`) ainda ignora os parâmetros da URL — só decorativo por enquanto
                         </span>
                       </li>
                     </ul>
@@ -1071,7 +1081,7 @@ export default async function FinanceiroPage({
                   <h2>Evolução financeira mensal</h2>
                   <div className="desc">
                     Frete contratado x melhor cotação disponível · diferença financeira identificada por mês ·
-                    base completa, ainda não reage ao filtro acima (ver Pendências na Visão Geral)
+                    reage ao filtro acima
                   </div>
                 </div>
                 {covNote}
@@ -1093,7 +1103,7 @@ export default async function FinanceiroPage({
                   <h2>Padrões da diferença financeira</h2>
                   <div className="desc">
                     Onde a diferença financeira se concentra — diferença observada, não erro nem economia perdida; a
-                    correlação não confirma motivo. Base completa, ainda não reage ao filtro da Visão Geral.
+                    correlação não confirma motivo. Reage ao filtro acima.
                   </div>
                 </div>
                 <PadroesCharts
@@ -1111,8 +1121,7 @@ export default async function FinanceiroPage({
                 <div className="bloc-head">
                   <h2>Peso, Cubagem &amp; Custo</h2>
                   <div className="desc">
-                    Relação entre peso, cubagem, prazo contratado e valor do frete · base completa, ainda não
-                    reage ao filtro da Visão Geral
+                    Relação entre peso, cubagem, prazo contratado e valor do frete · reage ao filtro acima
                   </div>
                 </div>
                 <PesoCustoCharts pesoBins={pesoBins} prazoRows={prazoFrete} />
@@ -1222,7 +1231,8 @@ export default async function FinanceiroPage({
                 </div>
               </section>
             </div>
-          </FinanceiroTabs>
+            </FinanceiroTabs>
+          </>
         )}
       </main>
 

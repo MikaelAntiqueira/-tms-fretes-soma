@@ -52,6 +52,16 @@ import { parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedi
 // bate quando a transportadora tem AMBAS as métricas naquele recorte. Prazo
 // Histórico, Região Comercial, Clientes e Cidades usam sempre a base completa.
 //
+// ATUALIZAÇÃO (2026-09-17): as 5 RPCs restantes (prazo_medio, prazo_hist,
+// regiao_comercial, clientes_metricas, cidades) ganharam os mesmos 11
+// parâmetros de filtro (migration `fn_transportadoras_add_filtro_global_
+// demais_subabas`) — todas as 5 sub-abas já reagem ao recorte. `filtroArgs`
+// nesta página continua só com os 4 parâmetros do <FilterBar> local (Mês/
+// Transportadora/Região/Tipo); as outras 7 dimensões das functions ficam
+// sempre null (= "todos") até esta página ganhar os mesmos 11 dropdowns já
+// usados em /financeiro e /dados — próxima etapa separada, não feita agora.
+// Cascata de opções também não foi estendida pra cá ainda.
+//
 // Opções dos 4 dropdowns: Mês vem de `filtro_opcoes_mes()` (function nova,
 // aditiva — /transportadoras não chama `financeiro_evolucao_mensal()`; `filtro_
 // opcoes_mes()` existe justamente para não obrigar uma RPC nova maior só para
@@ -198,13 +208,18 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
     p_tipos: filtros.tipos,
   };
   const [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes] = await Promise.all([
-    // única RPC com os 4 parâmetros de filtro — reage ao recorte
+    // As 6 RPCs desta página reagem ao recorte (2026-09-17, migration
+    // fn_transportadoras_add_filtro_global_demais_subabas) — `filtroArgs`
+    // só tem os 4 parâmetros que esta página já usa (Mês/Transportadora/
+    // Região/Tipo); as outras 7 dimensões das functions ficam null
+    // (equivalente a "todos"), aditivo — upgrade pras 11 dimensões
+    // completas (como em /financeiro e /dados) é próxima etapa separada.
     supabase.rpc("transportadoras_comparativo", filtroArgs),
-    supabase.rpc("transportadoras_prazo_medio"),
-    supabase.rpc("transportadoras_prazo_hist"),
-    supabase.rpc("transportadoras_regiao_comercial"),
-    supabase.rpc("transportadoras_clientes_metricas"),
-    supabase.rpc("transportadoras_cidades"),
+    supabase.rpc("transportadoras_prazo_medio", filtroArgs),
+    supabase.rpc("transportadoras_prazo_hist", filtroArgs),
+    supabase.rpc("transportadoras_regiao_comercial", filtroArgs),
+    supabase.rpc("transportadoras_clientes_metricas", filtroArgs),
+    supabase.rpc("transportadoras_cidades", filtroArgs),
   ]);
   for (const res of [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes]) {
     if (res.error) throw new Error(res.error.message);
@@ -364,10 +379,10 @@ export default async function TransportadorasPage({
             <p>
               Comparação factual entre as 7 transportadoras, por Preço × Prazo, Região Comercial,
               Cliente e Cidade — sobre <b>toda a base</b> (ofertas e contratações cruzadas a uma
-              cotação). A aba <b>Comparativo</b> já aceita os filtros de Mês, Transportadora Contratada,
-              Região Comercial e Tipo Cliente (Fase 2 do motor de filtro global); as demais 4 sub-abas
-              (Preço × Prazo, Região Comercial, Clientes, Cidades) ainda mostram sempre a base
-              completa, sem filtro.
+              cotação). As 5 sub-abas já aceitam os filtros de Mês, Transportadora Contratada, Região
+              Comercial e Tipo Cliente — as outras 7 dimensões do motor de filtro global (Romaneio,
+              Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de Peso, Faixa de Cubagem) ainda não
+              chegaram nesta página.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
@@ -416,11 +431,9 @@ export default async function TransportadorasPage({
               />
             </Suspense>
             {filtroAtivo && (
-              <div className="cov-note">
-                Os dados da aba <b>Comparativo</b> (tabela e ranking) abaixo já refletem o filtro acima.
-                As demais abas (Preço × Prazo, Região Comercial, Clientes, Cidades) ainda mostram a
-                base completa (não reagem ao filtro nesta etapa — mesmo corte de escopo já documentado em
-                /financeiro).
+              <div className="cov-note ok">
+                As 5 sub-abas (Comparativo, Preço × Prazo, Região Comercial, Clientes, Cidades) já
+                refletem o filtro acima.
               </div>
             )}
             <TransportadorasTabs
@@ -698,20 +711,20 @@ export default async function TransportadorasPage({
                       </span>
                     </li>
                     <li className="notes">
-                      <span className="name">Preço × Prazo (Quadrante), Região Comercial, Clientes, Cidades</span>
+                      <span className="name">Motor de filtro — só 4 das 11 dimensões nesta página</span>
                       <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                        ainda mostram sempre a base completa — a RPC `transportadoras_comparativo` já tem os
-                        4 parâmetros de filtro, mas as demais 5 RPCs desta página não ganharam parâmetros
-                        nesta etapa
+                        as 5 sub-abas já reagem a Mês/Transportadora/Região/Tipo (2026-09-17); as outras
+                        7 dimensões (Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de
+                        Peso, Faixa de Cubagem) — já disponíveis em /financeiro e /dados — ainda não
+                        chegaram aqui
                       </span>
                     </li>
                     <li className="notes">
-                      <span className="name">Motor de filtro — demais abas/páginas</span>
+                      <span className="name">Motor de filtro — cascata de opções e /oportunidades</span>
                       <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                        "Cotado × Contratado"/"Padrões da Diferença"/"Peso, Cubagem & Custo" e as demais
-                        4 páginas do dashboard ainda não reagem ao filtro — Fase 1 trouxe só /financeiro
-                        (Visão Geral) e Fase 2 trouxe /transportadoras (Comparativo) e /operacao
-                        (Meio-dia × Tarde)
+                        os dropdowns desta página ainda mostram sempre a lista completa de valores, não
+                        podada pelos outros filtros ativos; /oportunidades também ainda não aplica o
+                        filtro na consulta
                       </span>
                     </li>
                   </ul>
