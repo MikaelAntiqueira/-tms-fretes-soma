@@ -1185,11 +1185,20 @@ main.content.vg-main { padding: 14px 28px 18px; }
 :root[data-theme="dark"] .vg-card-minimo { color: var(--brand-300); }
 .vg-card-minimo svg { width: 11px; height: 11px; }
 
-/* ---- Modal de detalhe (drill-down "quem atingiu o mínimo") ---- */
+/* ---- Modal de detalhe (drill-down "quem atingiu o mínimo") ----
+   [2026-09-17, ajuste] Mikael pediu para reduzir a rolagem "quando
+   expandida" (o modal aberto ao clicar num bloco): antes o modal inteiro
+   rolava (.vg-modal com overflow-y:auto), então ao descer pra ver mais
+   clientes o cabeçalho (título + botão fechar) saía de vista, obrigando a
+   rolar pra cima de novo. Agora o modal é uma coluna flex de altura fixa:
+   cabeçalho e subtítulo (.vg-modal-head/.vg-modal-sub) ficam sempre
+   visíveis, e só a lista de clientes (.vg-modal-body, que envolve a
+   .table-scroll em VisaoGeralCard.tsx) rola internamente. */
 .vg-modal-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.vg-modal { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 22px 26px; max-width: 640px; width: 100%; max-height: 82vh; overflow-y: auto; }
-.vg-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.vg-modal { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 20px 26px 18px; max-width: 640px; width: 100%; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; }
+.vg-modal-head { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .vg-modal-head h3 { font-size: 16px; font-weight: 800; }
 .vg-modal-close { all: unset; cursor: pointer; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 4px; }
 .vg-modal-close:hover { color: var(--text-primary); }
-.vg-modal-sub { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px; }
+.vg-modal-sub { flex: none; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; }
+.vg-modal-body { flex: 1; overflow-y: auto; min-height: 0; }
