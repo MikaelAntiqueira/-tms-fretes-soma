@@ -1,14 +1,23 @@
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { MesSelector } from "@/components/MesSelector";
+import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { VisaoGeralCard, type VisaoGeralCardData } from "@/components/VisaoGeralCard";
-import { fmtBRL, fmtBRL2, fmtNum, fmtMes, fmtDate } from "@/lib/format";
+import { fmtBRL, fmtBRL2, fmtNum, fmtMes } from "@/lib/format";
 
 // Página "Visão Geral" (/) — redesenho MVE 2026-09-17. Ver o comentário do
 // commit para o histórico da decisão (3 áudios do Mikael com o Samuel).
 // Não é a página de prova de conceito da Fase 5 da migração (removida) —
 // esta é a "capa" real do dashboard, primeira tela que o Samuel vê.
+//
+// [2026-09-17, 2ª rodada] Mikael pediu pra inverter a prioridade visual:
+// os blocos por transportadora (Manhã/Tarde) são o que precisa caber na
+// tela sem rolar — os 2 KPIs financeiros (frete total, diferença
+// identificada) viraram um "resumo financeiro do período" no rodapé, só
+// visível rolando. No lugar deles, no topo, entrou um filtro combinado de
+// mês + dia (PeriodoSelector) — pequeno e centralizado, mesmo padrão do
+// DiaSelector já usado em /ontem. Dia é opcional e sempre relativo ao mês
+// escolhido (trocar de mês limpa o dia).
 export const dynamic = "force-dynamic";
 
 // Mesmo mapeamento nome→slot categórico já usado em ComparativoCharts.tsx e
@@ -34,11 +43,11 @@ const ORDEM_MANHA = ["Rede Nacional", "Fritz Express"];
 
 interface KpisVisaoGeral {
   mes: string;
-  mesAnterior: string;
+  mesAnterior: string | null;
   freteTotal: number;
-  freteTotalMesAnterior: number;
+  freteTotalMesAnterior: number | null;
   pagoAMais: number;
-  pagoAMaisMesAnterior: number;
+  pagoAMaisMesAnterior: number | null;
   nCruzadasPagoAMais: number;
   nContratacoes: number;
 }
@@ -63,12 +72,14 @@ interface VisaoGeralData {
   meses: string[];
   mesAtual: string | null;
   mesMaisRecente: string | null;
+  dias: string[];
+  diaAtual: string | null;
   kpis: KpisVisaoGeral | null;
   blocos: BlocoRow[];
   ultimaContratacao: string | null;
 }
 
-async function getVisaoGeralData(mesEscolhido: string | null): Promise<VisaoGeralData> {
+async function getVisaoGeralData(mesEscolhido: string | null, diaEscolhido: string | null): Promise<VisaoGeralData> {
   const supabase = await createSupabaseServerClient();
 
   const [mesesRes, ultimaRes] = await Promise.all([
@@ -84,12 +95,26 @@ async function getVisaoGeralData(mesEscolhido: string | null): Promise<VisaoGera
   const ultimaContratacao = (ultimaRes.data as { data_contratacao: string }[])?.[0]?.data_contratacao ?? null;
 
   if (!mesAtual) {
-    return { meses, mesAtual: null, mesMaisRecente: null, kpis: null, blocos: [], ultimaContratacao };
+    return {
+      meses,
+      mesAtual: null,
+      mesMaisRecente: null,
+      dias: [],
+      diaAtual: null,
+      kpis: null,
+      blocos: [],
+      ultimaContratacao,
+    };
   }
 
+  const diasRes = await supabase.rpc("visao_geral_dias_disponiveis", { p_mes: mesAtual });
+  if (diasRes.error) throw new Error(diasRes.error.message);
+  const dias = ((diasRes.data as { dia: string }[]) ?? []).map((r) => r.dia);
+  const diaAtual = diaEscolhido && dias.includes(diaEscolhido) ? diaEscolhido : null;
+
   const [kpisRes, blocosRes] = await Promise.all([
-    supabase.rpc("visao_geral_kpis", { p_mes: mesAtual }),
-    supabase.rpc("visao_geral_blocos", { p_mes: mesAtual }),
+    supabase.rpc("visao_geral_kpis", { p_mes: mesAtual, p_dia: diaAtual }),
+    supabase.rpc("visao_geral_blocos", { p_mes: mesAtual, p_dia: diaAtual }),
   ]);
   if (kpisRes.error) throw new Error(kpisRes.error.message);
   if (blocosRes.error) throw new Error(blocosRes.error.message);
@@ -97,11 +122,11 @@ async function getVisaoGeralData(mesEscolhido: string | null): Promise<VisaoGera
   const k = kpisRes.data as Record<string, unknown>;
   const kpis: KpisVisaoGeral = {
     mes: String(k.mes),
-    mesAnterior: String(k.mes_anterior),
+    mesAnterior: k.mes_anterior == null ? null : String(k.mes_anterior),
     freteTotal: Number(k.frete_total ?? 0),
-    freteTotalMesAnterior: Number(k.frete_total_mes_anterior ?? 0),
+    freteTotalMesAnterior: k.frete_total_mes_anterior == null ? null : Number(k.frete_total_mes_anterior),
     pagoAMais: Number(k.pago_a_mais ?? 0),
-    pagoAMaisMesAnterior: Number(k.pago_a_mais_mes_anterior ?? 0),
+    pagoAMaisMesAnterior: k.pago_a_mais_mes_anterior == null ? null : Number(k.pago_a_mais_mes_anterior),
     nCruzadasPagoAMais: Number(k.n_cruzadas_pago_a_mais ?? 0),
     nContratacoes: Number(k.n_contratacoes ?? 0),
   };
@@ -122,17 +147,18 @@ async function getVisaoGeralData(mesEscolhido: string | null): Promise<VisaoGera
     valorMinimo: r.valor_minimo == null ? null : Number(r.valor_minimo),
   }));
 
-  return { meses, mesAtual, mesMaisRecente, kpis, blocos, ultimaContratacao };
+  return { meses, mesAtual, mesMaisRecente, dias, diaAtual, kpis, blocos, ultimaContratacao };
 }
 
-function tendenciaTxt(atual: number, anterior: number, mesAnterior: string): string {
+function tendenciaTxt(atual: number, anterior: number | null, mesAnterior: string | null): string {
+  if (anterior == null || mesAnterior == null) return "dia único, sem comparação";
   if (anterior === 0) return `sem dado em ${fmtMes(mesAnterior)}`;
   const pct = ((atual - anterior) / anterior) * 100;
   const sinal = pct > 0 ? "+" : "";
   return `${sinal}${pct.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}% vs. ${fmtMes(mesAnterior)}`;
 }
 
-function BlocoCard({ b, mes }: { b: BlocoRow; mes: string }) {
+function BlocoCard({ b, mes, dia }: { b: BlocoRow; mes: string; dia: string | null }) {
   const data: VisaoGeralCardData = {
     transportadoraId: b.transportadoraId,
     transportadora: b.transportadora,
@@ -148,6 +174,7 @@ function BlocoCard({ b, mes }: { b: BlocoRow; mes: string }) {
     nClientesMinimo: b.nClientesMinimo,
     valorMinimo: b.valorMinimo,
     mes,
+    dia,
   };
   return <VisaoGeralCard data={data} />;
 }
@@ -160,11 +187,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
   await requireUser("/");
   const sp = await searchParams;
   const mesParam = Array.isArray(sp.mes) ? sp.mes[0] : sp.mes;
+  const diaParam = Array.isArray(sp.dia) ? sp.dia[0] : sp.dia;
 
   let data: VisaoGeralData | null = null;
   let erro: string | null = null;
   try {
-    data = await getVisaoGeralData(mesParam ?? null);
+    data = await getVisaoGeralData(mesParam ?? null, diaParam ?? null);
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
@@ -172,6 +200,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
   const meses = data?.meses ?? [];
   const mesAtual = data?.mesAtual ?? null;
   const mesMaisRecente = data?.mesMaisRecente ?? null;
+  const dias = data?.dias ?? [];
+  const diaAtual = data?.diaAtual ?? null;
   const kpis = data?.kpis ?? null;
   const blocos = data?.blocos ?? [];
   const ultimaContratacao = data?.ultimaContratacao ?? null;
@@ -191,7 +221,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Visão geral</h1>
-            <p>Frete total e quem está carregando, por transportadora e janela de contratação.</p>
+            <p>Quem está carregando agora, por transportadora e janela de contratação.</p>
           </div>
           <ThemeToggle />
         </div>
@@ -207,15 +237,45 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
           <div className="status-banner">Sem contratações nos dados atuais.</div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                {ultimaContratacao ? <>Dados até {fmtDate(ultimaContratacao.slice(0, 10))}</> : null}
-              </div>
-              <Suspense fallback={<div />}>
-                <MesSelector meses={meses} atual={mesAtual} mesMaisRecente={mesMaisRecente} />
-              </Suspense>
-            </div>
+            <Suspense fallback={<div />}>
+              <PeriodoSelector
+                meses={meses}
+                mesAtual={mesAtual}
+                mesMaisRecente={mesMaisRecente}
+                dias={dias}
+                diaAtual={diaAtual}
+                ultimaContratacao={ultimaContratacao}
+              />
+            </Suspense>
 
+            {blocosManha.length > 0 && (
+              <>
+                <div className="vg-section-label">Manhã</div>
+                <div className="vg-grid">
+                  {blocosManha.map((b) => (
+                    <BlocoCard key={`${b.transportadora}-${b.janela}`} b={b} mes={mesAtual} dia={diaAtual} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {blocosTarde.length > 0 && (
+              <>
+                <div className="vg-section-label">Tarde</div>
+                <div className="vg-grid">
+                  {blocosTarde.map((b) => (
+                    <BlocoCard key={`${b.transportadora}-${b.janela}`} b={b} mes={mesAtual} dia={diaAtual} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {blocosManha.length === 0 && blocosTarde.length === 0 && (
+              <div className="status-banner">Sem contratações neste recorte.</div>
+            )}
+
+            <div className="vg-resumo-divider" />
+            <div className="vg-section-label">Resumo financeiro do período</div>
             <div className="vg-hero-grid">
               <div className="vg-hero-card">
                 <div className="lbl">Frete total no período</div>
@@ -228,32 +288,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
                 <div className="trend">{tendenciaTxt(kpis.pagoAMais, kpis.pagoAMaisMesAnterior, kpis.mesAnterior)}</div>
               </div>
             </div>
-            <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: -8, marginBottom: 14, textAlign: "center" }}>
+            <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: 8, textAlign: "center" }}>
               Diferença = só as {fmtNum(kpis.nCruzadasPagoAMais)} contratações com cotação para comparar — o frete
               total acima é sobre toda a base.
             </div>
-
-            {blocosManha.length > 0 && (
-              <>
-                <div className="vg-section-label">Manhã</div>
-                <div className="vg-grid">
-                  {blocosManha.map((b) => (
-                    <BlocoCard key={`${b.transportadora}-${b.janela}`} b={b} mes={mesAtual} />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {blocosTarde.length > 0 && (
-              <>
-                <div className="vg-section-label">Tarde</div>
-                <div className="vg-grid" style={{ marginBottom: 0 }}>
-                  {blocosTarde.map((b) => (
-                    <BlocoCard key={`${b.transportadora}-${b.janela}`} b={b} mes={mesAtual} />
-                  ))}
-                </div>
-              </>
-            )}
           </>
         )}
       </main>
