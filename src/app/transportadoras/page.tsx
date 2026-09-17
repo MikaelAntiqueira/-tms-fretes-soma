@@ -52,22 +52,23 @@ import { parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedi
 // bate quando a transportadora tem AMBAS as métricas naquele recorte. Prazo
 // Histórico, Região Comercial, Clientes e Cidades usam sempre a base completa.
 //
-// ATUALIZAÇÃO (2026-09-17): as 5 RPCs restantes (prazo_medio, prazo_hist,
-// regiao_comercial, clientes_metricas, cidades) ganharam os mesmos 11
-// parâmetros de filtro (migration `fn_transportadoras_add_filtro_global_
-// demais_subabas`) — todas as 5 sub-abas já reagem ao recorte. `filtroArgs`
-// nesta página continua só com os 4 parâmetros do <FilterBar> local (Mês/
-// Transportadora/Região/Tipo); as outras 7 dimensões das functions ficam
-// sempre null (= "todos") até esta página ganhar os mesmos 11 dropdowns já
-// usados em /financeiro e /dados — próxima etapa separada, não feita agora.
-// Cascata de opções também não foi estendida pra cá ainda.
+// ATUALIZAÇÃO (2026-09-17, parte 1): as 5 RPCs restantes (prazo_medio,
+// prazo_hist, regiao_comercial, clientes_metricas, cidades) ganharam os
+// mesmos 11 parâmetros de filtro (migration `fn_transportadoras_add_filtro_
+// global_demais_subabas`) — todas as 5 sub-abas já reagem ao recorte.
 //
-// Opções dos 4 dropdowns: Mês vem de `filtro_opcoes_mes()` (function nova,
-// aditiva — /transportadoras não chama `financeiro_evolucao_mensal()`; `filtro_
-// opcoes_mes()` existe justamente para não obrigar uma RPC nova maior só para
-// listar os meses). Região/Tipo vêm de `financeiro_filtro_opcoes()` (já existe,
-// reaproveitada — não criamos outra). Transportadora usa TRANSP_ORDER, a mesma
-// lista fixa das 7 transportadoras já usada em CARRIER_COLOR.
+// ATUALIZAÇÃO (2026-09-17, parte 2): upgrade pras 11 dimensões completas do
+// <FilterBar> (igual /financeiro e /dados) — `filtros`/`filtroArgs` ganharam
+// Romaneio/Esc/Prazo/Cidade/Janela/FaixaPeso/FaixaCubagem. As opções dos 10
+// dropdowns que não são "Transportadora" agora vêm de
+// `financeiro_filtro_opcoes_cascata()` (reaproveitada de /financeiro — é
+// page-agnostic, só lê `v_cotacao_filtros`), o que também resolve a cascata
+// de opções nesta página de graça (cada dropdown já só mostra valores
+// compatíveis com as outras 10 dimensões ativas). As functions antigas
+// `filtro_opcoes_mes()`/`financeiro_filtro_opcoes()` (só mês/região/tipo,
+// sem cascata) saíram de uso aqui. Transportadora continua com a lista fixa
+// TRANSP_ORDER (mesma usada em CARRIER_COLOR pro resto da página) — só 7
+// itens, não vale a pena trocar por uma lista dinâmica.
 //
 // Validação esperada (post-deployment, manual): chamada sem args == 7 linhas,
 // R$ 494.417,43 (mesmos números de sempre, regressão zero); chamada com
@@ -197,33 +198,66 @@ interface TransportadorasData {
   regiaoComercial: RegiaoComercialRow[];
   clientes: ClienteMetricaRow[];
   cidades: CidadeRow[];
+  opcoesMeses: string[];
+  opcoesRegioes: string[];
+  opcoesTipos: string[];
+  opcoesRomaneios: string[];
+  opcoesEsc: string[];
+  opcoesPrazos: number[];
+  opcoesCidades: string[];
+  opcoesJanelas: string[];
+  opcoesFaixasPeso: string[];
+  opcoesFaixasCubagem: string[];
 }
 
 async function getTransportadorasData(filtros: FiltrosTransp): Promise<TransportadorasData> {
   const supabase = await createSupabaseServerClient();
+  // [2026-09-17] Upgrade pras 11 dimensões completas do motor de filtro
+  // global (igual /financeiro e /dados) — as 7 que faltavam (Romaneio, Esc,
+  // Prazo, Cidade, Janela, Faixa de Peso, Faixa de Cubagem) se somam às 4
+  // já existentes (Mês/Transportadora/Região/Tipo). Reaproveita
+  // `financeiro_filtro_opcoes_cascata()` (já existe, page-agnostic — só lê
+  // v_cotacao_filtros) em vez de criar uma function nova: ganha cascata de
+  // verdade pras 10 dimensões (Transportadora continua com a lista fixa
+  // TRANSP_ORDER, usada também no resto da página pra cor/ordem dos
+  // gráficos — não vale a pena trocar por uma lista dinâmica de só 7 itens).
   const filtroArgs = {
     p_meses: filtros.meses,
     p_transportadoras: filtros.transportadoras,
     p_regioes: filtros.regioes,
     p_tipos: filtros.tipos,
+    p_romaneios: filtros.romaneios,
+    p_esc: filtros.esc,
+    p_prazos: filtros.prazos,
+    p_cidades: filtros.cidades,
+    p_janelas: filtros.janelas,
+    p_faixas_peso: filtros.faixasPeso,
+    p_faixas_cubagem: filtros.faixasCubagem,
   };
-  const [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes] = await Promise.all([
-    // As 6 RPCs desta página reagem ao recorte (2026-09-17, migration
-    // fn_transportadoras_add_filtro_global_demais_subabas) — `filtroArgs`
-    // só tem os 4 parâmetros que esta página já usa (Mês/Transportadora/
-    // Região/Tipo); as outras 7 dimensões das functions ficam null
-    // (equivalente a "todos"), aditivo — upgrade pras 11 dimensões
-    // completas (como em /financeiro e /dados) é próxima etapa separada.
+  const [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes, opcoesRes] = await Promise.all([
     supabase.rpc("transportadoras_comparativo", filtroArgs),
     supabase.rpc("transportadoras_prazo_medio", filtroArgs),
     supabase.rpc("transportadoras_prazo_hist", filtroArgs),
     supabase.rpc("transportadoras_regiao_comercial", filtroArgs),
     supabase.rpc("transportadoras_clientes_metricas", filtroArgs),
     supabase.rpc("transportadoras_cidades", filtroArgs),
+    supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
   ]);
-  for (const res of [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes]) {
+  for (const res of [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes, opcoesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
+
+  const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
+  const opcoesMeses: string[] = (opcoesRow?.meses as string[] | null) ?? [];
+  const opcoesRegioes: string[] = (opcoesRow?.regioes as string[] | null) ?? [];
+  const opcoesTipos: string[] = (opcoesRow?.tipos as string[] | null) ?? [];
+  const opcoesRomaneios: string[] = (opcoesRow?.romaneios as string[] | null) ?? [];
+  const opcoesEsc: string[] = (opcoesRow?.escs as string[] | null) ?? [];
+  const opcoesPrazos: number[] = ((opcoesRow?.prazos as string[] | null) ?? []).map(Number);
+  const opcoesCidades: string[] = (opcoesRow?.cidades as string[] | null) ?? [];
+  const opcoesJanelas: string[] = (opcoesRow?.janelas as string[] | null) ?? [];
+  const opcoesFaixasPeso: string[] = (opcoesRow?.faixas_peso as string[] | null) ?? [];
+  const opcoesFaixasCubagem: string[] = (opcoesRow?.faixas_cubagem as string[] | null) ?? [];
 
   const comparativo: TransportadoraRow[] = ((compRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
     transportadora: String(r.transportadora),
@@ -304,16 +338,29 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
     cidade_total_frete: Number(r.cidade_total_frete ?? 0),
   }));
 
-  return { comparativo, quadrante, prazoHist, regiaoComercial, clientes, cidades };
+  return {
+    comparativo, quadrante, prazoHist, regiaoComercial, clientes, cidades,
+    opcoesMeses, opcoesRegioes, opcoesTipos, opcoesRomaneios, opcoesEsc,
+    opcoesPrazos, opcoesCidades, opcoesJanelas, opcoesFaixasPeso, opcoesFaixasCubagem,
+  };
 }
 
-// Filtros da Fase 2 do motor de filtro global
-// src/app/financeiro/page.tsx (`null` numa dimensão = sem filtro nela).
+// Filtros do motor de filtro global — as 4 da Fase 2 + as 7 que faltavam
+// (upgrade 2026-09-17, mesma convenção de src/app/financeiro/page.tsx;
+// `null` numa dimensão = sem filtro nela). `prazos` fica number[] (não
+// string[]) porque a coluna/param SQL são int[].
 interface FiltrosTransp {
   meses: string[] | null;
   transportadoras: string[] | null;
   regioes: string[] | null;
   tipos: string[] | null;
+  romaneios: string[] | null;
+  esc: string[] | null;
+  prazos: number[] | null;
+  cidades: string[] | null;
+  janelas: string[] | null;
+  faixasPeso: string[] | null;
+  faixasCubagem: string[] | null;
 }
 
 export default async function TransportadorasPage({
@@ -325,37 +372,40 @@ export default async function TransportadorasPage({
   // src/lib/supabase-server.ts.
   await requireUser("/transportadoras");
   const sp = await searchParams;
+  const prazosParam = parseMulti(sp.prazo);
   const filtros: FiltrosTransp = {
     meses: parseMulti(sp.mes),
     transportadoras: parseMulti(sp.transportadora),
     regioes: parseMulti(sp.regiao),
     tipos: parseMulti(sp.tipo),
+    romaneios: parseMulti(sp.romaneio),
+    esc: parseMulti(sp.esc),
+    prazos: prazosParam ? prazosParam.map(Number) : null,
+    cidades: parseMulti(sp.cidade),
+    janelas: parseMulti(sp.janela),
+    faixasPeso: parseMulti(sp.faixaPeso),
+    faixasCubagem: parseMulti(sp.faixaCubagem),
   };
-  const filtroAtivo = Boolean(filtros.meses || filtros.transportadoras || filtros.regioes || filtros.tipos);
+  const filtroAtivo = Object.values(filtros).some((v) => v != null);
 
   let data: TransportadorasData | null = null;
-  let opcoesMeses: string[] = [];
-  let opcoesRegioes: string[] = [];
-  let opcoesTipos: string[] = [];
   let erro: string | null = null;
   try {
-    const supabase = await createSupabaseServerClient();
-    const [dataRes, mesesRes, opcoesRes] = await Promise.all([
-      getTransportadorasData(filtros),
-      supabase.rpc("filtro_opcoes_mes"),
-      supabase.rpc("financeiro_filtro_opcoes"),
-    ]);
-    for (const res of [mesesRes, opcoesRes]) {
-      if (res.error) throw new Error(res.error.message);
-    }
-    data = dataRes;
-    opcoesMeses = ((mesesRes.data as Record<string, unknown>[])?.[0]?.meses as string[] | null) ?? [];
-    const opcoesRow = (opcoesRes.data as Record<string, unknown>[])?.[0];
-    opcoesRegioes = (opcoesRow?.regioes as string[] | null) ?? [];
-    opcoesTipos = (opcoesRow?.tipos as string[] | null) ?? [];
+    data = await getTransportadorasData(filtros);
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
+
+  const opcoesMeses = data?.opcoesMeses ?? [];
+  const opcoesRegioes = data?.opcoesRegioes ?? [];
+  const opcoesTipos = data?.opcoesTipos ?? [];
+  const opcoesRomaneios = data?.opcoesRomaneios ?? [];
+  const opcoesEsc = data?.opcoesEsc ?? [];
+  const opcoesPrazos = data?.opcoesPrazos ?? [];
+  const opcoesCidades = data?.opcoesCidades ?? [];
+  const opcoesJanelas = data?.opcoesJanelas ?? [];
+  const opcoesFaixasPeso = data?.opcoesFaixasPeso ?? [];
+  const opcoesFaixasCubagem = data?.opcoesFaixasCubagem ?? [];
 
   const rows = data?.comparativo ?? [];
   const quadrante = data?.quadrante ?? [];
@@ -379,10 +429,10 @@ export default async function TransportadorasPage({
             <p>
               Comparação factual entre as 7 transportadoras, por Preço × Prazo, Região Comercial,
               Cliente e Cidade — sobre <b>toda a base</b> (ofertas e contratações cruzadas a uma
-              cotação). As 5 sub-abas já aceitam os filtros de Mês, Transportadora Contratada, Região
-              Comercial e Tipo Cliente — as outras 7 dimensões do motor de filtro global (Romaneio,
-              Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de Peso, Faixa de Cubagem) ainda não
-              chegaram nesta página.
+              cotação). As 5 sub-abas já aceitam as 11 dimensões do motor de filtro global (Mês,
+              Transportadora Contratada, Região Comercial, Tipo Cliente, Romaneio, Escolheu a Mais
+              Barata, Prazo, Cidade, Janela, Faixa de Peso, Faixa de Cubagem), com cascata de opções nos
+              dropdowns.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
@@ -427,6 +477,18 @@ export default async function TransportadorasPage({
                     labelAll: "Todos os tipos",
                     options: opcoesTipos,
                   },
+                  { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneios },
+                  { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEsc, format: "esc" },
+                  {
+                    param: "prazo",
+                    labelAll: "Todos os prazos",
+                    options: opcoesPrazos.map(String),
+                    format: "prazo",
+                  },
+                  { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidades },
+                  { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelas },
+                  { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: opcoesFaixasPeso },
+                  { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: opcoesFaixasCubagem },
                 ]}
               />
             </Suspense>
@@ -708,22 +770,6 @@ export default async function TransportadorasPage({
                       <span className="name">Performance</span>
                       <span className="num notes" style={{ color: "var(--text-muted)" }}>
                         não é uma aba própria — mesma tabela de "Comparativo" (fusão já decidida)
-                      </span>
-                    </li>
-                    <li className="notes">
-                      <span className="name">Motor de filtro — só 4 das 11 dimensões nesta página</span>
-                      <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                        as 5 sub-abas já reagem a Mês/Transportadora/Região/Tipo (2026-09-17); as outras
-                        7 dimensões (Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de
-                        Peso, Faixa de Cubagem) — já disponíveis em /financeiro e /dados — ainda não
-                        chegaram aqui
-                      </span>
-                    </li>
-                    <li className="notes">
-                      <span className="name">Motor de filtro — cascata de opções</span>
-                      <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                        os dropdowns desta página ainda mostram sempre a lista completa de valores, não
-                        podada pelos outros filtros ativos (já funciona em /financeiro)
                       </span>
                     </li>
                   </ul>
