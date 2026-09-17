@@ -1118,25 +1118,39 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 /* ==========================================================================
    Página "Visão Geral" (/) — redesenho MVE (2026-09-17, decisão do
    Mikael). Substitui a página de prova de conceito original (4 tiles
-   FATO/DERIVADO/INDICADOR) por 2 KPIs executivos (frete total, pago a
-   mais) + blocos por transportadora agrupados em Manhã (Meio-dia) e Tarde,
-   cada bloco clicável abrindo o detalhe de quem atingiu o frete mínimo.
-   Reaproveita .card/.grid/.pill já existentes onde possível; classes novas
-   abaixo são só o necessário para o layout específico desta página.
-   Ver src/app/page.tsx.
+   FATO/DERIVADO/INDICADOR) por 2 KPIs executivos (frete total, diferença
+   identificada) + blocos por transportadora agrupados em Manhã (Meio-dia)
+   e Tarde, cada bloco clicável abrindo o detalhe de quem atingiu o frete
+   mínimo. Reaproveita .card/.grid/.pill já existentes onde possível;
+   classes novas abaixo são só o necessário para o layout específico desta
+   página. Ver src/app/page.tsx.
+
+   [2026-09-17, ajuste] Mikael achou os 2 primeiros quadrados grandes
+   demais e pediu a página inteira visível numa tela só, sem rolar —
+   .vg-header/.vg-main encolhem cabeçalho/padding só NESTA página (não
+   mexem em .app-header/.content compartilhados, usados por todas as
+   outras); hero cards e blocos por transportadora tiveram fonte/padding
+   reduzidos pelo mesmo motivo. Rótulo "Pago a mais que a mais barata" virou
+   "Diferença identificada" (termo já usado no resto do projeto, mais curto).
    ========================================================================== */
-.vg-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+.app-header.vg-header { padding: 16px 24px; }
+.app-header.vg-header h1 { font-size: 19px; margin: 3px 0 2px; }
+.app-header.vg-header p { font-size: 12px; }
+
+main.content.vg-main { padding: 14px 28px 18px; }
+
+.vg-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 @media (max-width: 720px) { .vg-hero-grid { grid-template-columns: 1fr; } }
 
-.vg-hero-card { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 22px 24px; text-align: center; }
-.vg-hero-card .lbl { font: 700 12px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
-.vg-hero-card .val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 34px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.vg-hero-card { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 18px; text-align: center; }
+.vg-hero-card .lbl { font: 700 10.5px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 3px; }
+.vg-hero-card .val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 21px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
 .vg-hero-card .val.neg { color: var(--critical); }
-.vg-hero-card .trend { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+.vg-hero-card .trend { font-size: 10.5px; color: var(--text-secondary); margin-top: 2px; }
 
-.vg-section-label { font: 700 12px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); text-align: center; margin-bottom: 12px; }
+.vg-section-label { font: 700 11px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); text-align: center; margin: 2px 0 6px; }
 
-.vg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+.vg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 @media (max-width: 720px) { .vg-grid { grid-template-columns: 1fr; } }
 
 .vg-card {
@@ -1144,24 +1158,24 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   border: 1px solid var(--border);
   border-left: 5px solid var(--vg-carrier-color, var(--brand-700));
   border-radius: var(--radius-card);
-  padding: 18px 22px;
+  padding: 9px 14px;
   cursor: pointer;
   transition: box-shadow 0.12s ease;
 }
 .vg-card:hover { box-shadow: var(--shadow-card); }
 .vg-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.vg-card-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.vg-card-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
-.vg-card-value { font-family: var(--font-ibm-plex-mono), monospace; font-size: 28px; font-weight: 700; color: var(--text-primary); }
-.vg-card-metrics { font-size: 12px; color: var(--text-secondary); border-collapse: collapse; }
-.vg-card-metrics td { padding: 1px 0; }
-.vg-card-metrics td:first-child { padding-right: 10px; }
+.vg-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vg-card-name { font-size: 12.5px; font-weight: 700; margin-bottom: 1px; color: var(--text-primary); }
+.vg-card-value { font-family: var(--font-ibm-plex-mono), monospace; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.vg-card-metrics { font-size: 10.5px; color: var(--text-secondary); border-collapse: collapse; }
+.vg-card-metrics td { padding: 0; line-height: 1.35; }
+.vg-card-metrics td:first-child { padding-right: 8px; }
 .vg-card-metrics td:last-child { text-align: right; font-weight: 500; color: var(--text-primary); }
 .vg-card-minimo {
   border-top: 1px dashed var(--border);
-  margin-top: 10px;
-  padding-top: 8px;
-  font-size: 11.5px;
+  margin-top: 6px;
+  padding-top: 5px;
+  font-size: 10px;
   color: var(--brand-700);
   display: flex;
   align-items: center;
@@ -1169,7 +1183,7 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 }
 :root:not([data-theme="light"]) .vg-card-minimo,
 :root[data-theme="dark"] .vg-card-minimo { color: var(--brand-300); }
-.vg-card-minimo svg { width: 13px; height: 13px; }
+.vg-card-minimo svg { width: 11px; height: 11px; }
 
 /* ---- Modal de detalhe (drill-down "quem atingiu o mínimo") ---- */
 .vg-modal-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
