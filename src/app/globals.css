@@ -38,14 +38,18 @@
   --critical-bg: rgba(208, 59, 59, 0.1);
   --info-bg: rgba(8, 140, 179, 0.09);
 
-  /* Paleta categórica (gráficos/séries) */
-  --t1: #2a78d6;
-  --t2: #eb6834;
-  --t3: #1baf7a;
+  /* Paleta categórica (gráficos/séries) — [2026-09-17] cores de costume por
+     transportadora (mapeamento nome→slot em CARRIER_COLOR/CARRIER_VAR nos
+     componentes, inalterado): t1 Fritz (roxo), t2 LKW (amarelo), t3 Leomar
+     (laranja), t4 Minuano (amarelo-mostarda), t5 Rede Nacional (rosa,
+     já era essa cor), t6 Santa Cruz (azul), t7 São Miguel (verde). */
+  --t1: #4a3aa7;
+  --t2: #eda100;
+  --t3: #eb6834;
   --t4: #c98500;
   --t5: #e0629a;
-  --t6: #1a8f1a;
-  --t7: #4a3aa7;
+  --t6: #2a78d6;
+  --t7: #1baf7a;
 
   --shadow-card: 0 1px 2px rgba(13, 36, 54, 0.06), 0 8px 24px -12px rgba(13, 36, 54, 0.14);
   --radius-card: 14px;
@@ -82,13 +86,13 @@
     --serious-bg: rgba(240, 137, 92, 0.14);
     --critical-bg: rgba(242, 105, 95, 0.14);
     --info-bg: rgba(79, 192, 232, 0.12);
-    --t1: #5b9fe8;
-    --t2: #f08a5e;
-    --t3: #3ecf9a;
+    --t1: #8f7fe0;
+    --t2: #f5d576;
+    --t3: #f08a5e;
     --t4: #e0a83f;
     --t5: #ee88b3;
-    --t6: #4fc25f;
-    --t7: #8f7fe0;
+    --t6: #5b9fe8;
+    --t7: #3ecf9a;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
@@ -121,13 +125,13 @@
   --serious-bg: rgba(240, 137, 92, 0.14);
   --critical-bg: rgba(242, 105, 95, 0.14);
   --info-bg: rgba(79, 192, 232, 0.12);
-  --t1: #5b9fe8;
-  --t2: #f08a5e;
-  --t3: #3ecf9a;
+  --t1: #8f7fe0;
+  --t2: #f5d576;
+  --t3: #f08a5e;
   --t4: #e0a83f;
   --t5: #ee88b3;
-  --t6: #4fc25f;
-  --t7: #8f7fe0;
+  --t6: #5b9fe8;
+  --t7: #3ecf9a;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
@@ -1110,3 +1114,68 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 @media (max-width:900px){
   body.filters-mobile-open .msel-pop{ position:static; max-width:none; box-shadow:none; border-color:var(--border); }
 }
+
+/* ==========================================================================
+   Página "Visão Geral" (/) — redesenho MVE (2026-09-17, decisão do
+   Mikael). Substitui a página de prova de conceito original (4 tiles
+   FATO/DERIVADO/INDICADOR) por 2 KPIs executivos (frete total, pago a
+   mais) + blocos por transportadora agrupados em Manhã (Meio-dia) e Tarde,
+   cada bloco clicável abrindo o detalhe de quem atingiu o frete mínimo.
+   Reaproveita .card/.grid/.pill já existentes onde possível; classes novas
+   abaixo são só o necessário para o layout específico desta página.
+   Ver src/app/page.tsx.
+   ========================================================================== */
+.vg-hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+@media (max-width: 720px) { .vg-hero-grid { grid-template-columns: 1fr; } }
+
+.vg-hero-card { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 22px 24px; text-align: center; }
+.vg-hero-card .lbl { font: 700 12px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+.vg-hero-card .val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 34px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.vg-hero-card .val.neg { color: var(--critical); }
+.vg-hero-card .trend { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+
+.vg-section-label { font: 700 12px var(--font-ibm-plex-sans), sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); text-align: center; margin-bottom: 12px; }
+
+.vg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+@media (max-width: 720px) { .vg-grid { grid-template-columns: 1fr; } }
+
+.vg-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--vg-carrier-color, var(--brand-700));
+  border-radius: var(--radius-card);
+  padding: 18px 22px;
+  cursor: pointer;
+  transition: box-shadow 0.12s ease;
+}
+.vg-card:hover { box-shadow: var(--shadow-card); }
+.vg-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vg-card-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.vg-card-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
+.vg-card-value { font-family: var(--font-ibm-plex-mono), monospace; font-size: 28px; font-weight: 700; color: var(--text-primary); }
+.vg-card-metrics { font-size: 12px; color: var(--text-secondary); border-collapse: collapse; }
+.vg-card-metrics td { padding: 1px 0; }
+.vg-card-metrics td:first-child { padding-right: 10px; }
+.vg-card-metrics td:last-child { text-align: right; font-weight: 500; color: var(--text-primary); }
+.vg-card-minimo {
+  border-top: 1px dashed var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+  font-size: 11.5px;
+  color: var(--brand-700);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+:root:not([data-theme="light"]) .vg-card-minimo,
+:root[data-theme="dark"] .vg-card-minimo { color: var(--brand-300); }
+.vg-card-minimo svg { width: 13px; height: 13px; }
+
+/* ---- Modal de detalhe (drill-down "quem atingiu o mínimo") ---- */
+.vg-modal-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.42); z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.vg-modal { background: var(--surface-card); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 22px 26px; max-width: 640px; width: 100%; max-height: 82vh; overflow-y: auto; }
+.vg-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.vg-modal-head h3 { font-size: 16px; font-weight: 800; }
+.vg-modal-close { all: unset; cursor: pointer; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.vg-modal-close:hover { color: var(--text-primary); }
+.vg-modal-sub { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px; }
