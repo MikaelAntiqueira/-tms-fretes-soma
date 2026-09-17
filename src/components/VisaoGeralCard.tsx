@@ -66,7 +66,7 @@ export function VisaoGeralCard({ data }: { data: VisaoGeralCardData }) {
     }
   }
 
-  const cardStyle: CSSProperties = { ["--vg-carrier-color" as never]: `var(${data.colorVar})` };
+  const cardStyle = { "--vg-carrier-color": `var(${data.colorVar})` } as CSSProperties;
 
   return (
     <>
