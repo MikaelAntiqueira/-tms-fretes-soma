@@ -91,48 +91,47 @@ async function fetchComparacoes(filtros: {
 }): Promise<{ rows: ComparacaoRow[]; totalCotacoes: number }> {
   const supabase = await createSupabaseServerClient();
 
-  // Build PostgREST filter for the comparacoes view.
-  // Cada dimensão vira um filtro `or` (OU dentro da dimensão) e as
-  // dimensões se combinam com AND (interseção entre dimensões).
-  //
-  // A view comparacoes tem colunas:
-  //   data_contratacao, transportadora_contratada,
-  //   regiao_normalizada, tipo_cliente
-  // que correspondem às 4 dimensões do filtro.
+  // [FIX 2026-09-17] `comparacoes` tem 5.194 linhas — acima do "Max Rows" da
+  // API do Supabase (1000, config do projeto, não contornável só com
+  // `.range()`: o servidor recorta a resposta de qualquer jeito). Sem isso,
+  // a página buscava só as primeiras 1.000 e reportava como se fosse a
+  // cobertura REAL da base ("1.000 processos, 14,5% da base") — quando o
+  // real é 5.194 (75,1%). Fix: pagina em lotes de 1000 — 1ª página já traz
+  // o total exato (`count: "exact"`), as demais páginas disparam em
+  // paralelo (Promise.all), não em série, pra não somar latência à toa.
+  // Achado ao trabalhar no motor de filtro desta página, não relacionado.
+  const PAGE = 1000;
+  const orderOpts = { ascending: false, nullsFirst: false } as const;
 
-  const filterParts: string[] = [];
-
-  if (filtros.meses && filtros.meses.length > 0) {
-    const conditions = filtros.meses.map((m) => `data_contratacao~\"${m}-\"`);
-    filterParts.push(`(${conditions.join(" or ")})`);
-  }
-  if (filtros.transportadoras && filtros.transportadoras.length > 0) {
-    const conditions = filtros.transportadoras.map((t) => `transportadora_contratada=eq.${t}`);
-    filterParts.push(`(${conditions.join(" or ")})`);
-  }
-  if (filtros.regioes && filtros.regioes.length > 0) {
-    const conditions = filtros.regioes.map((r) => `regiao_normalizada=eq.${r}`);
-    filterParts.push(`(${conditions.join(" or ")})`);
-  }
-  if (filtros.tipos && filtros.tipos.length > 0) {
-    const conditions = filtros.tipos.map((t) => `tipo_cliente=eq.${t}`);
-    filterParts.push(`(${conditions.join(" or ")})`);
-  }
-
-  const filter = filterParts.length > 0 ? filterParts.join(",") : undefined;
-
-  // Contagem total de cotações na base (para cobertura).
-  const [{ count: totalCotacoes }, { data, error }] = await Promise.all([
+  const [{ data: firstPage, count: totalComparacoes, error: firstError }, { count: totalCotacoes }] = await Promise.all([
+    supabase.from("comparacoes").select("*", { count: "exact" }).order("diffR", orderOpts).range(0, PAGE - 1),
     supabase.from("cotacoes").select("*", { count: "exact", head: true }),
-    supabase.from("comparacoes").select("*").order("diffR", { ascending: false, nullsFirst: false }),
   ]);
+  if (firstError) throw new Error(firstError.message);
 
-  if (error) throw new Error(error.message);
+  const restPageCount = Math.max(0, Math.ceil((totalComparacoes ?? 0) / PAGE) - 1);
+  const restPages = await Promise.all(
+    Array.from({ length: restPageCount }, (_, i) => {
+      const offset = (i + 1) * PAGE;
+      return supabase.from("comparacoes").select("*").order("diffR", orderOpts).range(offset, offset + PAGE - 1);
+    })
+  );
+  for (const p of restPages) {
+    if (p.error) throw new Error(p.error.message);
+  }
+  const allRows: Record<string, unknown>[] = [...(firstPage ?? []), ...restPages.flatMap((p) => p.data ?? [])];
 
   // Aplicar filtros na linha (PostgREST não suporta filter string raw via SDK,
-  // então filtramos manualmente no cliente com as mesmas condições).
-  let filtered = data ?? [];
-  if (filter) {
+  // então filtramos manualmente no cliente com as mesmas condições). Cada
+  // dimensão é OU dentro de si e AND entre dimensões — mesma convenção do
+  // FilterBar em todas as outras páginas.
+  const algumFiltroAtivo =
+    (filtros.meses?.length ?? 0) > 0 ||
+    (filtros.transportadoras?.length ?? 0) > 0 ||
+    (filtros.regioes?.length ?? 0) > 0 ||
+    (filtros.tipos?.length ?? 0) > 0;
+  let filtered = allRows;
+  if (algumFiltroAtivo) {
     filtered = filtered.filter((row) => {
       // data_contratacao~\"2026-07\" → começa com o mês (proteção contra null)
       if (filtros.meses && filtros.meses.length > 0) {

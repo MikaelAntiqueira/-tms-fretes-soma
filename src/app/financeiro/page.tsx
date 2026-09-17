@@ -1063,10 +1063,11 @@ export default async function FinanceiroPage({
                         </span>
                       </li>
                       <li className="notes">
-                        <span className="name">Motor de filtro — /oportunidades</span>
+                        <span className="name">/oportunidades — bug de cobertura corrigido (2026-09-17)</span>
                         <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          os dropdowns do filtro aparecem na página, mas a consulta em si (view
-                          `comparacoes`) ainda ignora os parâmetros da URL — só decorativo por enquanto
+                          buscava só as 1.000 primeiras linhas de `comparacoes` (limite da API) e reportava
+                          isso como 14,5% da base, quando o real é 5.194 linhas (75,1%) — corrigido com
+                          paginação; o filtro em si já funcionava
                         </span>
                       </li>
                     </ul>

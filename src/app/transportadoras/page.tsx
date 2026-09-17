@@ -720,11 +720,10 @@ export default async function TransportadorasPage({
                       </span>
                     </li>
                     <li className="notes">
-                      <span className="name">Motor de filtro — cascata de opções e /oportunidades</span>
+                      <span className="name">Motor de filtro — cascata de opções</span>
                       <span className="num notes" style={{ color: "var(--text-muted)" }}>
                         os dropdowns desta página ainda mostram sempre a lista completa de valores, não
-                        podada pelos outros filtros ativos; /oportunidades também ainda não aplica o
-                        filtro na consulta
+                        podada pelos outros filtros ativos (já funciona em /financeiro)
                       </span>
                     </li>
                   </ul>
