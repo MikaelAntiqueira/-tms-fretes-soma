@@ -26,6 +26,7 @@ interface ClienteMinimoRow {
   cidade: string | null;
   vezes: number;
   valor_total: number;
+  notas: string | null;
 }
 
 // Card por transportadora × janela na Visão Geral — nome + valor em
@@ -145,42 +146,46 @@ export function VisaoGeralCard({ data }: { data: VisaoGeralCardData }) {
               {fmtNum(data.nClientesMinimo)} cliente(s) · {fmtBRL(data.valorMinimo)} pagos no piso de{" "}
               {fmtBRL2(data.freteMinimoObservado)} ou abaixo (estimativa, não tabela oficial)
             </div>
-            {loading ? (
-              <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Carregando…</div>
-            ) : erro ? (
-              <div className="status-banner erro">{erro}</div>
-            ) : (
-              <div className="table-scroll">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Cliente</th>
-                      <th>Cidade</th>
-                      <th className="num">Vezes</th>
-                      <th className="num">Valor total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(clientes ?? []).length === 0 ? (
+            <div className="vg-modal-body">
+              {loading ? (
+                <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Carregando…</div>
+              ) : erro ? (
+                <div className="status-banner erro">{erro}</div>
+              ) : (
+                <div className="table-scroll">
+                  <table className="data">
+                    <thead>
                       <tr>
-                        <td colSpan={4} style={{ color: "var(--text-muted)" }}>
-                          Sem clientes neste recorte.
-                        </td>
+                        <th>Cliente</th>
+                        <th>Cidade</th>
+                        <th className="num">Vezes</th>
+                        <th className="num">Valor total</th>
+                        <th>Nota(s) fiscal</th>
                       </tr>
-                    ) : (
-                      (clientes ?? []).map((c, i) => (
-                        <tr key={i}>
-                          <td>{c.cliente}</td>
-                          <td>{c.cidade ?? "—"}</td>
-                          <td className="num">{fmtNum(c.vezes)}</td>
-                          <td className="num">{fmtBRL2(c.valor_total)}</td>
+                    </thead>
+                    <tbody>
+                      {(clientes ?? []).length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ color: "var(--text-muted)" }}>
+                            Sem clientes neste recorte.
+                          </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      ) : (
+                        (clientes ?? []).map((c, i) => (
+                          <tr key={i}>
+                            <td>{c.cliente}</td>
+                            <td>{c.cidade ?? "—"}</td>
+                            <td className="num">{fmtNum(c.vezes)}</td>
+                            <td className="num">{fmtBRL2(c.valor_total)}</td>
+                            <td style={{ whiteSpace: "normal" }}>{c.notas ?? "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
