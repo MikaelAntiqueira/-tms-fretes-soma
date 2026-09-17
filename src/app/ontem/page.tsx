@@ -6,11 +6,11 @@ import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemT
 import { DiaSelector } from "@/components/DiaSelector";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
-// Página "Ontem" (D-1) — decisões de contratação do dia mais recente com
-// contratação cruzada a uma cotação. Porta, linha a linha, a lógica de
-// `renderOntem()` / `coverageStatus()` / `radarCards()` do Artifact original
-// (v40/v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md` e
-// `memoria/05_DICIONARIO_KPIS.md` (KPI-16, KPI-18/D7, Radar de Decisão
+// Página "Resumo do Dia" (D-1) — decisões de contratação do dia mais
+// recente com contratação cruzada a uma cotação. Porta, linha a linha, a
+// lógica de `renderOntem()` / `coverageStatus()` / `radarCards()` do
+// Artifact original (v40/v42) — ver `docs/mapa-migracao-tms-v3-2026-09-11.md`
+// e `memoria/05_DICIONARIO_KPIS.md` (KPI-16, KPI-18/D7, Radar de Decisão
 // D2/D3/D4/D6). Toda agregação pesada (janelas de 60/30 dias, mediana/IQR
 // por bucket) é feita dentro do banco via RPC (`ontem_dia_referencia`,
 // `ontem_kpis`, `ontem_contratacoes`, `ontem_cobertura` — migration
@@ -38,6 +38,13 @@ import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, E
 // (componente novo) segue a mesma convenção do FilterBar (estado na URL,
 // nenhuma função cruzando a fronteira Server→Client Component — ver
 // [FIX 2026-09-15, D-30] em FilterBar.tsx).
+//
+// [TÍTULO] "Resumo do Dia" (2026-09-17, a pedido do Mikael) — o nome
+// exibido pro usuário mudou de "Ontem" pra "Resumo do Dia" (e o item do
+// menu, de "Hoje" pra igual, ver DashboardShell.tsx): nem "Hoje" nem
+// "Ontem" descrevem certo um conteúdo que agora tem seletor de dia — o
+// usuário pode escolher qualquer data. A rota `/ontem` e os nomes
+// internos (RPCs, variáveis) não mudam de propósito — só o texto visível.
 export const dynamic = "force-dynamic";
 
 interface OntemKpis {
@@ -784,11 +791,10 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
         <div className="app-header-inner">
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Ontem — decisões de contratação</h1>
+            <h1>Resumo do Dia — decisões de contratação</h1>
             <p>
-              Fechamento do último dia com contratações cruzadas a uma cotação — os mesmos
-              indicadores e a mesma tabela da página &quot;Ontem&quot; do Artifact atual, agora lendo
-              direto do Supabase. Já é possível escolher outro dia específico no seletor abaixo.
+              Fechamento do último dia com contratações registradas e comparadas a uma cotação.
+              Você pode escolher outro dia específico no seletor abaixo.
             </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
@@ -810,7 +816,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
           <>
             <section className="bloc" style={{ marginTop: 0 }}>
               <div className="bloc-head" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                <h2>Ontem — decisões de contratação</h2>
+                <h2>Resumo do Dia — decisões de contratação</h2>
                 <Suspense fallback={<div className="dia-selector" />}>
                   <DiaSelector dias={diasDisponiveis} atual={ref} diaMaisRecente={diaMaisRecente} />
                 </Suspense>
