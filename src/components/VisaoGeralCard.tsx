@@ -2,7 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { fmtBRL, fmtBRL2, fmtNum } from "@/lib/format";
+import { fmtBRL, fmtBRL2, fmtNum, fmtDate } from "@/lib/format";
 
 export interface VisaoGeralCardData {
   transportadoraId: string;
@@ -19,6 +19,7 @@ export interface VisaoGeralCardData {
   nClientesMinimo: number;
   valorMinimo: number | null;
   mes: string;
+  dia: string | null;
 }
 
 interface ClienteMinimoRow {
@@ -57,6 +58,7 @@ export function VisaoGeralCard({ data }: { data: VisaoGeralCardData }) {
         p_mes: data.mes,
         p_transportadora_id: data.transportadoraId,
         p_janela: data.janela,
+        p_dia: data.dia,
       });
       if (error) throw new Error(error.message);
       setClientes((rows as ClienteMinimoRow[]) ?? []);
@@ -136,7 +138,8 @@ export function VisaoGeralCard({ data }: { data: VisaoGeralCardData }) {
           <div className="vg-modal" onClick={(e) => e.stopPropagation()}>
             <div className="vg-modal-head">
               <h3>
-                {data.transportadora} · {data.janela} · atingiram o frete mínimo
+                {data.transportadora} · {data.janela}
+                {data.dia ? ` · ${fmtDate(data.dia)}` : ""} · atingiram o frete mínimo
               </h3>
               <button type="button" className="vg-modal-close" onClick={() => setOpen(false)}>
                 fechar
