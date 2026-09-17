@@ -186,18 +186,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header vg-header">
         <div className="app-header-inner">
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Visão geral</h1>
-            <p>Frete total e quem está carregando por transportadora, separado por janela de contratação.</p>
+            <p>Frete total e quem está carregando, por transportadora e janela de contratação.</p>
           </div>
           <ThemeToggle />
         </div>
       </header>
 
-      <main className="content wide">
+      <main className="content wide vg-main">
         {erro ? (
           <div className="status-banner erro">
             <b>Não foi possível consultar o Supabase.</b>
@@ -207,8 +207,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
           <div className="status-banner">Sem contratações nos dados atuais.</div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              <div style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
                 {ultimaContratacao ? <>Dados até {fmtDate(ultimaContratacao.slice(0, 10))}</> : null}
               </div>
               <Suspense fallback={<div />}>
@@ -216,21 +216,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
               </Suspense>
             </div>
 
-            <div className="vg-hero-grid" style={{ marginTop: 18 }}>
+            <div className="vg-hero-grid">
               <div className="vg-hero-card">
                 <div className="lbl">Frete total no período</div>
                 <div className="val">{fmtBRL(kpis.freteTotal)}</div>
                 <div className="trend">{tendenciaTxt(kpis.freteTotal, kpis.freteTotalMesAnterior, kpis.mesAnterior)}</div>
               </div>
               <div className="vg-hero-card">
-                <div className="lbl">Pago a mais que a mais barata</div>
+                <div className="lbl">Diferença identificada</div>
                 <div className="val neg">{fmtBRL(kpis.pagoAMais)}</div>
                 <div className="trend">{tendenciaTxt(kpis.pagoAMais, kpis.pagoAMaisMesAnterior, kpis.mesAnterior)}</div>
               </div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: -16, marginBottom: 24, textAlign: "center" }}>
-              &quot;Pago a mais&quot; considera só as {fmtNum(kpis.nCruzadasPagoAMais)} contratações com cotação para
-              comparar (cobertura estrutural da fonte, não erro) — o frete total acima é sobre toda a base.
+            <div style={{ fontSize: 10.5, color: "var(--text-muted)", marginTop: -8, marginBottom: 14, textAlign: "center" }}>
+              Diferença = só as {fmtNum(kpis.nCruzadasPagoAMais)} contratações com cotação para comparar — o frete
+              total acima é sobre toda a base.
             </div>
 
             {blocosManha.length > 0 && (
@@ -257,11 +257,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
           </>
         )}
       </main>
-
-      <footer className="app-footer">
-        Documento-mãe desta migração: <code>mapa-migracao-tms-v3-2026-09-11.md</code> (projeto
-        original, ver README).
-      </footer>
     </div>
   );
 }
