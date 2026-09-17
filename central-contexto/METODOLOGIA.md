@@ -89,9 +89,18 @@ Até 5 situações por dia que merecem atenção — nunca acusa erro.
 - **D6 — Anomalia de preço**: frete contratado acima da mediana + 3×IQR da mesma
   transportadora, na mesma faixa de peso e cubagem (amostra ≥ 30). Confiabilidade MÉDIA — pode
   ser carga atípica legítima, vale conferir a NF.
-- **D1/D5 — aguardando dado**: "Oportunidade objetiva" (D1) precisa de prazo E prestação de
-  serviço por oferta; "Frete mínimo fora do parâmetro" (D5) precisa dos valores oficiais por
-  transportadora. Nenhum dos dois é calculado enquanto o dado não chegar — nunca estimado.
+- **D1 — Oportunidade objetiva [D-32, 2026-09-17]**: usa o prazo REAL da oferta da alternativa
+  nesta mesma cotação (`ofertas.prazo_dias`, ~87,5% de cobertura) — decisão do Mikael: tratar
+  "prestação de serviço" como equivalente ao prazo, não bloquear o detector esperando um campo
+  que nunca foi definido. Quando o prazo real da alternativa é PIOR que o da contratada, a
+  linha é descartada (prova que não é oportunidade), não rebaixada. Sem prazo real desta
+  cotação (~12,5% dos casos), cai no fallback antigo (proxy = mediana histórica, vira D2).
+- **D5 — Frete mínimo fora do parâmetro [D-33, 2026-09-17]**: usa
+  `transportadoras.frete_minimo_observado` (ESTIMATIVA estatística, D-04) até a gestão enviar a
+  tabela oficial (`frete_minimo_config`) — decisão do Mikael, reconciliar quando ela chegar.
+  Na prática os desvios encontrados até agora são pequenos (centavos a poucos reais), então o
+  card raramente entra no top-5 do Radar (scoring por magnitude em R$) — não é bug, é o
+  detector perdendo espaço pra oportunidades financeiramente maiores no mesmo dia.
 
 ## Outras regras estruturais
 

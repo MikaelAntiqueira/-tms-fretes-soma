@@ -416,3 +416,56 @@ MESMO DIA pelo Mikael (10/09), e o Artifact v40 (11/09) pode ter recebido só os
 SQL atual (`GREATEST(peso_real_kg, peso_cubado_kg)`, já seguindo [DEC-27] à risca) mais correto e
 atualizado que essa versão específica do Artifact, não errado. Não alterado até confirmar com o
 Mikael ou achar uma versão do Artifact posterior a ambas as decisões pra comparar.
+
+## D-32 — D1 "Oportunidade objetiva" ligado: prazo real da oferta, "prestação" tratada como equivalente ao prazo
+
+**Decisão (Mikael, 2026-09-17)**: o Radar de Decisão (`/ontem`) estava com D1 "aguardando dado"
+porque o desenho original (`docs/specs/2026-09-09-radar-de-decisao-v2-design.md`) exigia prazo
+E prestação de serviço por oferta, e "prestação" nunca foi definida como campo. Ao ser
+perguntado, Mikael respondeu que a base já deveria ter isso ("acredito que tenha o prazo") e,
+questionado sobre prestação, decidiu: "trate como prazo mesmo" — ou seja, não esperar mais por
+um campo de prestação que não existe; usar só o prazo real da oferta como critério.
+
+**Implementação**: `ofertas.prazo_dias` já vem do pipeline (`parse_cotacoes.py` →
+`delivery_time.days`) com ~87,5% de cobertura (19.122 de 21.851 ofertas, checado em
+2026-09-17) — só não era exposto para a alternativa (`t_bar`) dentro de `v_ontem_radar`, que só
+comparava contra um proxy (mediana histórica da transportadora). Migration
+`radar_d1_prazo_real_e_d5_frete_minimo_observado`: `v_ontem_radar` ganhou a coluna
+`prazo_barata` (prazo real da oferta da alternativa NESTA cotação específica); `radar_d2`
+passou a retornar essa coluna. Em `ontem/page.tsx::buildRadarCards`, quando `prazo_barata`
+existe: se `prazo_barata <= prazo_contratada` → card D1 "OPORTUNIDADE OBJETIVA" (ALTA
+confiabilidade, fato, não proxy); se `prazo_barata > prazo_contratada`, a linha é DESCARTADA
+(o dado real prova que a troca foi por prazo, não é oportunidade — R-ZERO, diferença ≠ erro,
+nunca rebaixar pra "menos confiável" o que o dado já desmentiu). Sem prazo real da alternativa
+nesta cotação (~12,5% dos casos), cai no fallback antigo (D2, proxy histórico, como sempre foi).
+
+**Motivo**: destrava um detector que ficaria bloqueado indefinidamente esperando a gestão
+definir um campo ("prestação de serviço") que nunca foi sequer especificado, quando o prazo já
+disponível na base já responde à mesma pergunta de negócio ("essa troca era objetivamente
+melhor?") com boa cobertura e sem inventar nada.
+
+## D-33 — D5 "Frete mínimo fora do parâmetro" ligado: usa o piso observado (estimativa) até a tabela oficial chegar
+
+**Decisão (Mikael, 2026-09-17)**: D5 estava "aguardando dado" (tabela oficial de frete mínimo
+por transportadora, nunca enviada pela gestão — ver D-04). Perguntado se podia usar o piso já
+"identificado" (`transportadoras.frete_minimo_observado`, estimativa estatística sobre o
+histórico real, D-04, hoje só exibida em `/operacao`), Mikael confirmou: "pode seguir com que
+você falou, depois conflitamos com a tabela oficial" — ou seja, usar a estimativa agora, e
+reconciliar contra `frete_minimo_config` (tabela oficial) quando a gestão enviá-la.
+
+**Implementação**: nova função `radar_d5(p_dia)` (migration
+`radar_d1_prazo_real_e_d5_frete_minimo_observado`) — sinaliza contratações do dia com
+`frete_contratado < transportadoras.frete_minimo_observado`. Card sempre rotulado como
+estimativa (confiabilidade MÉDIA, `confMot` explícito: "piso observado estatisticamente — ainda
+não é o parâmetro oficial da gestão"), nunca apresentado como regra oficial (D-04 continua
+valendo). `frete_minimo_config` (coluna já existente, hoje vazia pras 7 transportadoras) é onde
+a tabela oficial vai entrar quando chegar — nesse momento, reconciliar/comparar os dois valores
+antes de trocar a fonte do detector.
+
+**Achado, não é bug**: nos dias já testados, os desvios encontrados são pequenos (R$ 0,45 em
+2026-07-15, por exemplo) — muito menores em magnitude do que RECORRÊNCIA/CONCENTRAÇÃO (centenas
+a milhares de reais). Como o scoring do Radar prioriza por magnitude em R$, D5 tende a nunca
+entrar no top-5 de cards do dia mesmo quando há ocorrências reais. Não alterado nesta etapa —
+fica registrado caso o Mikael queira no futuro que D5 apareça independente de magnitude (ex.:
+reservar 1 slot fixo pra ele), já que "abaixo do piso" é mais uma questão de conformidade do que
+de tamanho financeiro.

@@ -15,8 +15,9 @@ import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, E
 // por bucket) é feita dentro do banco via RPC (`ontem_dia_referencia`,
 // `ontem_kpis`, `ontem_contratacoes`, `ontem_cobertura` — migration
 // `fn_ontem_view_e_funcoes`; `radar_prazo_hist`, `radar_d2`, `radar_d3`,
-// `radar_d4`, `radar_d6` — migrations `fn_radar_decisao_d2_d3_d4_d6` e
-// `fn_radar_d2_d6_add_drill_columns`), nunca somando/agrupando linhas cruas
+// `radar_d4`, `radar_d5`, `radar_d6` — migrations `fn_radar_decisao_d2_d3_d4_d6`,
+// `fn_radar_d2_d6_add_drill_columns` e `radar_d1_prazo_real_e_d5_frete_minimo_observado`
+// [D-32]/[D-33], 2026-09-17), nunca somando/agrupando linhas cruas
 // no cliente. Só o SCORING + DEDUPLICAÇÃO final do Radar (barato — dezenas
 // de candidatos no máximo) roda aqui em TypeScript, replicando literalmente
 // a lógica de `radarCards()`.
@@ -96,6 +97,17 @@ interface RadarD2Row {
   diferenca_r: number;
   diferenca_pct: number | null;
   prazo_contratada: number | null;
+  prazo_barata: number | null;
+}
+
+interface RadarD5Row {
+  romaneio: string | null;
+  cidade: string | null;
+  cliente: string | null;
+  transportadora: string | null;
+  frete_contratado: number;
+  frete_minimo_observado: number;
+  diferenca_r: number;
 }
 
 interface RadarD3Row {
@@ -193,14 +205,54 @@ function buildRadarCards(
   d2: RadarD2Row[],
   d3: RadarD3Row[],
   d4: RadarD4Row[],
+  d5: RadarD5Row[],
   d6: RadarD6Row[],
   prazoHist: Map<string, number | null>
 ): RadarCardData[] {
   const cand: RadarCardData[] = [];
 
-  // ---- D2 — Oportunidade a verificar ----
+  // ---- D1/D2 — Oportunidade objetiva (prazo real) / a verificar (proxy) ----
+  // [D-32] (2026-09-17): D1 usa o prazo REAL da oferta da alternativa nesta
+  // MESMA cotação (ofertas.prazo_dias via v_ontem_radar.prazo_barata, ~87,5%
+  // de cobertura) — "prestação de serviço" é tratada como equivalente ao
+  // prazo por decisão do Mikael, não bloqueia mais o detector. Quando o
+  // prazo real da alternativa for PIOR que o da contratada, o dado já prova
+  // que não é oportunidade (troca legítima por prazo) — descarta a linha,
+  // não rebaixa a confiança (R-ZERO: diferença ≠ erro). Só cai no fallback
+  // D2 (proxy = mediana histórica) quando o prazo real da alternativa não
+  // existe para esta cotação específica (~12,5% dos casos).
   for (const r of d2) {
     const pr = r.prazo_contratada;
+    const pb = r.prazo_barata;
+    if (pb != null && pr != null) {
+      if (pb > pr) continue;
+      cand.push({
+        tipo: "OPORTUNIDADE OBJETIVA",
+        transp: r.transportadora_contratada,
+        magNum: r.diferenca_r,
+        titulo: `Rom. ${r.romaneio ?? "—"} · ${r.cidade ?? "—"}`,
+        magTxt: `+${fmtBRL(r.diferenca_r)} · ${fmtPct(r.diferenca_pct)}`,
+        evid: [
+          `contratou ${r.transportadora_contratada ?? "—"}; ${r.transportadora_barata} cotou mais barato o mesmo romaneio`,
+          `prazo da alternativa ${pb}d ≤ ${pr}d da contratada — dado real desta cotação, não é proxy`,
+        ],
+        regra: 'esc="N" ∧ diferença>0 ∧ alternativa cotou o mesmo romaneio ∧ prazo real da alternativa ≤ prazo contratado',
+        conf: "ALTA",
+        confMot: 'prazo real da própria cotação (ofertas.prazo_dias) — "prestação" tratada como equivalente ao prazo',
+        acao: "Renegociar",
+        drill: [
+          {
+            romaneio: r.romaneio,
+            cliente: r.cliente,
+            transportadora: r.transportadora_contratada,
+            frete_contratado: r.frete_contratado,
+            melhor_cotacao: r.melhor_cotacao,
+            diferenca_r: r.diferenca_r,
+          },
+        ],
+      });
+      continue;
+    }
     const ph = r.transportadora_barata ? prazoHist.get(r.transportadora_barata) ?? null : null;
     const prazoOk = pr != null && ph != null && ph <= pr;
     const phTxt = ph != null ? (Number.isInteger(ph) ? String(ph) : fmtNum(ph, 1)) : "";
@@ -219,14 +271,14 @@ function buildRadarCards(
       evid: [
         `contratou ${r.transportadora_contratada ?? "—"}; ${r.transportadora_barata} cotou mais barato o mesmo romaneio`,
         prazoTxt,
-        "prestação de serviço: não informada nos dados",
+        "sem prazo real desta oferta específica — usando proxy histórico",
       ],
       regra: 'esc="N" ∧ diferença>0 ∧ alternativa cotou o mesmo romaneio',
       conf: prazoOk ? "MÉDIA" : "BAIXA",
       confMot:
         pr != null && ph != null
-          ? "prazo por proxy (mediana histórica); prestação ausente"
-          : "sem prazo comparável e sem prestação",
+          ? "prazo por proxy (mediana histórica) — prazo real desta cotação ausente"
+          : "sem prazo comparável, nem real nem por proxy",
       acao: "Investigar",
       drill: [
         {
@@ -235,6 +287,39 @@ function buildRadarCards(
           transportadora: r.transportadora_contratada,
           frete_contratado: r.frete_contratado,
           melhor_cotacao: r.melhor_cotacao,
+          diferenca_r: r.diferenca_r,
+        },
+      ],
+    });
+  }
+
+  // ---- D5 — Frete mínimo fora do parâmetro ----
+  // [D-33] (2026-09-17): usa transportadoras.frete_minimo_observado
+  // (ESTIMATIVA estatística, D-04) por decisão do Mikael, até a gestão
+  // enviar a tabela oficial (frete_minimo_config) — reconciliar quando
+  // chegar. Sempre rotulado como estimativa aqui, nunca como regra oficial.
+  for (const r of d5) {
+    cand.push({
+      tipo: "FRETE MÍNIMO FORA DO PARÂMETRO",
+      transp: r.transportadora,
+      magNum: r.diferenca_r,
+      titulo: `Rom. ${r.romaneio ?? "—"} · ${r.cidade ?? "—"}`,
+      magTxt: `${fmtBRL(r.frete_contratado)} vs. piso observado ${fmtBRL(r.frete_minimo_observado)}`,
+      evid: [
+        `${r.transportadora ?? "—"} — frete contratado ${fmtBRL(r.frete_contratado)} abaixo do piso estatístico observado (${fmtBRL(r.frete_minimo_observado)})`,
+        "piso é uma estimativa sobre o histórico real, ainda não a tabela oficial da gestão — quando ela chegar, este card passa a comparar contra o valor oficial",
+      ],
+      regra: "frete contratado < piso observado da transportadora (estimativa estatística, D-04)",
+      conf: "MÉDIA",
+      confMot: "piso observado estatisticamente — ainda não é o parâmetro oficial da gestão",
+      acao: "Investigar",
+      drill: [
+        {
+          romaneio: r.romaneio,
+          cliente: r.cliente,
+          transportadora: r.transportadora,
+          frete_contratado: r.frete_contratado,
+          melhor_cotacao: null,
           diferenca_r: r.diferenca_r,
         },
       ],
@@ -319,11 +404,30 @@ function buildRadarCards(
     const w = c.conf === "ALTA" ? 1 : c.conf === "MÉDIA" ? 0.6 : 0.3;
     c.score = ((c.magNum || 0) / maxMag) * w;
   });
-  cand.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
   const seenT: Record<string, number> = {};
   const seenTr: Record<string, number> = {};
   const out: RadarCardData[] = [];
-  for (const c of cand) {
+
+  // Vaga reservada pro D5 [D-33, decisão Mikael 2026-09-17]: "abaixo do
+  // piso" é questão de conformidade, não de tamanho financeiro — os
+  // desvios em R$ costumam ser pequenos (centavos a poucos reais) perto de
+  // RECORRÊNCIA/CONCENTRAÇÃO, então nunca ganhava do scoring por magnitude
+  // e ficava sempre fora do top-5. Garante 1 card D5 (o de maior desvio do
+  // dia) antes do resto disputar normalmente pelas vagas restantes.
+  const d5Cands = cand
+    .filter((c) => c.tipo === "FRETE MÍNIMO FORA DO PARÂMETRO")
+    .sort((a, b) => (b.magNum || 0) - (a.magNum || 0));
+  const resto = cand.filter((c) => c.tipo !== "FRETE MÍNIMO FORA DO PARÂMETRO").concat(d5Cands.slice(1));
+  if (d5Cands[0]) {
+    const c = d5Cands[0];
+    out.push(c);
+    seenT[c.tipo] = 1;
+    seenTr[c.transp || "-"] = (seenTr[c.transp || "-"] || 0) + 1;
+  }
+
+  resto.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  for (const c of resto) {
     const kt = c.tipo;
     const kr = c.transp || "-";
     if ((seenT[kt] || 0) >= 2 || (seenTr[kr] || 0) >= 2) continue;
@@ -337,14 +441,15 @@ function buildRadarCards(
 
 async function getRadarData(ref: string): Promise<RadarCardData[]> {
   const supabase = await createSupabaseServerClient();
-  const [prazoRes, d2Res, d3Res, d4Res, d6Res] = await Promise.all([
+  const [prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res] = await Promise.all([
     supabase.rpc("radar_prazo_hist"),
     supabase.rpc("radar_d2", { p_dia: ref }),
     supabase.rpc("radar_d3", { p_dia: ref }),
     supabase.rpc("radar_d4", { p_dia: ref }),
+    supabase.rpc("radar_d5", { p_dia: ref }),
     supabase.rpc("radar_d6", { p_dia: ref }),
   ]);
-  for (const res of [prazoRes, d2Res, d3Res, d4Res, d6Res]) {
+  for (const res of [prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -364,6 +469,17 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     diferenca_r: Number(r.diferenca_r ?? 0),
     diferenca_pct: r.diferenca_pct == null ? null : Number(r.diferenca_pct),
     prazo_contratada: r.prazo_contratada == null ? null : Number(r.prazo_contratada),
+    prazo_barata: r.prazo_barata == null ? null : Number(r.prazo_barata),
+  }));
+
+  const d5: RadarD5Row[] = ((d5Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+    romaneio: (r.romaneio as string) ?? null,
+    cidade: (r.cidade as string) ?? null,
+    cliente: (r.cliente as string) ?? null,
+    transportadora: (r.transportadora as string) ?? null,
+    frete_contratado: Number(r.frete_contratado ?? 0),
+    frete_minimo_observado: Number(r.frete_minimo_observado ?? 0),
+    diferenca_r: Number(r.diferenca_r ?? 0),
   }));
 
   const d3: RadarD3Row[] = ((d3Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
@@ -402,7 +518,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     faixa_cubagem: (r.faixa_cubagem as string) ?? null,
   }));
 
-  return buildRadarCards(d2, d3, d4, d6, prazoHist);
+  return buildRadarCards(d2, d3, d4, d5, d6, prazoHist);
 }
 
 async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
@@ -739,30 +855,11 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               )}
             </section>
 
+            {/* Card "Aguardando dado / regra" (D1/D5) removido em 2026-09-17:
+                os dois detectores que ele bloqueava foram ligados nesta
+                etapa ([D-32]/[D-33]) — ver comentário no topo do arquivo. */}
             <section className="bloc">
-              <div className="grid cols2">
-                <div className="card">
-                  <h3>Aguardando dado / regra</h3>
-                  <div className="sub">detectores que ligam quando a informação chegar da gestão / do TMS</div>
-                  <div className="alert-card info" style={{ marginTop: 8 }}>
-                    <ul>
-                      <li className="notes">
-                        <span className="name">Oportunidade objetiva (prazo + prestação iguais)</span>
-                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          aguarda prazo e prestação por oferta (TMS/API)
-                        </span>
-                      </li>
-                      <li className="notes">
-                        <span className="name">Frete mínimo fora do parâmetro</span>
-                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          aguarda os valores por transportadora (gestão)
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                <OntemTendenciaChart rows={tendencia} diaRef={ref} />
-              </div>
+              <OntemTendenciaChart rows={tendencia} diaRef={ref} />
             </section>
 
             <section className="bloc">
