@@ -368,14 +368,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     opcoesRes,
     evolucaoRes,
     diffNRes,
-    diffPrazoRes,
-    diffRegiaoRes,
-    diffTranspRes,
-    diffTipoRes,
-    pesoFreteRes,
-    outliersRes,
-    prazoFreteRes,
-    cubagemRes,
+    padroesPesoRes,
     simulacaoRes,
   ] = await Promise.all([
     // ---- as 4 RPCs que a sub-aba "Visão Geral" usa: reagem ao filtro ----
@@ -390,20 +383,24 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     // isso recebe o filtroArgs completo (a function ignora internamente o
     // parâmetro da própria dimensão de cada lista que calcula).
     supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
-    // ---- demais sub-abas ("Cotado × Contratado", "Padrões da Diferença",
-    // "Peso, Cubagem & Custo") — ligadas ao filtro global em 2026-09-17
-    // (migration fn_financeiro_add_filtro_global_padroes_pesocustagem_
-    // cotadocontratado), mesmo padrão das 4 RPCs da Visão Geral acima ----
+    // ---- sub-aba "Cotado × Contratado" — ligada ao filtro global em
+    // 2026-09-17 (migration fn_financeiro_add_filtro_global_padroes_
+    // pesocustagem_cotadocontratado), mesmo padrão das 4 RPCs acima ----
     supabase.rpc("financeiro_evolucao_mensal", filtroArgs),
     supabase.rpc("financeiro_diff_n_esc_nao", filtroArgs),
-    supabase.rpc("financeiro_diff_por_prazo", filtroArgs),
-    supabase.rpc("financeiro_diff_por_regiao", filtroArgs),
-    supabase.rpc("financeiro_diff_por_transportadora", filtroArgs),
-    supabase.rpc("financeiro_diff_por_tipo_cliente", filtroArgs),
-    supabase.rpc("financeiro_peso_frete", filtroArgs),
-    supabase.rpc("financeiro_outliers_peso", filtroArgs),
-    supabase.rpc("financeiro_prazo_frete_medio", filtroArgs),
-    supabase.rpc("financeiro_cubagem_custo", filtroArgs),
+    // ---- [FIX 2026-09-18] "Padrões da Diferença" + "Peso, Cubagem & Custo"
+    // eram 8 RPCs separadas (financeiro_diff_por_prazo/_regiao/
+    // _transportadora/_tipo_cliente, financeiro_peso_frete/_outliers_peso/
+    // _prazo_frete_medio/_cubagem_custo), todas recomputando a mesma view
+    // v_financeiro_padroes_base de forma independente e concorrente dentro
+    // deste mesmo Promise.all — sob carga, isso estourava o statement_
+    // timeout de 8s do role authenticated (PostgREST error=57014,
+    // confirmado nos logs do Supabase) e derrubava a página inteira com
+    // "Não foi possível consultar o Supabase". Consolidadas numa única RPC
+    // (financeiro_padroes_pesocustagem_dashboard, migration de mesmo nome)
+    // que calcula a base filtrada 1 vez só e devolve os 8 resultados num
+    // jsonb — as 8 functions antigas continuam no banco, sem uso aqui.
+    supabase.rpc("financeiro_padroes_pesocustagem_dashboard", filtroArgs),
     // ---- Simulação de Custo por Transportadora (4º bloco Visão Geral) —
     // reage ao filtro; a própria function só devolve linhas com exatamente
     // 1 transportadora filtrada (ver migration fn_financeiro_simulacao_custo).
@@ -417,14 +414,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     opcoesRes,
     evolucaoRes,
     diffNRes,
-    diffPrazoRes,
-    diffRegiaoRes,
-    diffTranspRes,
-    diffTipoRes,
-    pesoFreteRes,
-    outliersRes,
-    prazoFreteRes,
-    cubagemRes,
+    padroesPesoRes,
     simulacaoRes,
   ]) {
     if (res.error) throw new Error(res.error.message);
@@ -507,7 +497,13 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   const maxMes = evolucaoRows[0]?.max_mes != null ? String(evolucaoRows[0].max_mes) : null;
   const diffNEscNao = Number(diffNRes.data ?? 0);
 
-  const diffPrazoRows = (diffPrazoRes.data as Record<string, unknown>[]) ?? [];
+  // ---- [FIX 2026-09-18] as 8 tabelas abaixo agora vêm de 1 jsonb só
+  // (financeiro_padroes_pesocustagem_dashboard) — ver comentário no
+  // Promise.all acima. Mesmo shape de linha de cada RPC antiga, só a
+  // origem do array mudou. ----
+  const padroesPeso = (padroesPesoRes.data ?? {}) as Record<string, Record<string, unknown>[]>;
+
+  const diffPrazoRows = padroesPeso.diff_por_prazo ?? [];
   const diffPorPrazo: DiffPorPrazoRow[] = diffPrazoRows.map((r) => ({
     prazo: Number(r.prazo),
     diffMedia: Number(r.diff_media ?? 0),
@@ -516,31 +512,29 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   const comPrazo = Number(diffPrazoRows[0]?.com_prazo ?? 0);
   const semPrazo = Number(diffPrazoRows[0]?.sem_prazo ?? 0);
 
-  const diffPorRegiao: DiffPorRegiaoRow[] = ((diffRegiaoRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const diffPorRegiao: DiffPorRegiaoRow[] = (padroesPeso.diff_por_regiao ?? []).map((r) => ({
     regiao: String(r.regiao),
     diffSum: Number(r.diff_sum ?? 0),
   }));
 
-  const diffPorTransportadora: DiffPorTransportadoraRow[] = ((diffTranspRes.data as Record<string, unknown>[]) ?? []).map(
-    (r) => ({
-      transportadora: String(r.transportadora),
-      diffSum: Number(r.diff_sum ?? 0),
-    })
-  );
+  const diffPorTransportadora: DiffPorTransportadoraRow[] = (padroesPeso.diff_por_transportadora ?? []).map((r) => ({
+    transportadora: String(r.transportadora),
+    diffSum: Number(r.diff_sum ?? 0),
+  }));
 
-  const diffPorTipo: DiffPorTipoRow[] = ((diffTipoRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const diffPorTipo: DiffPorTipoRow[] = (padroesPeso.diff_por_tipo ?? []).map((r) => ({
     tipo: String(r.tipo),
     diffSum: Number(r.diff_sum ?? 0),
   }));
 
-  const pesoBins: PesoBinRow[] = ((pesoFreteRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const pesoBins: PesoBinRow[] = (padroesPeso.peso_frete ?? []).map((r) => ({
     binIdx: Number(r.bin_idx),
     binLabel: String(r.bin_label),
     n: Number(r.n ?? 0),
     freteMedio: Number(r.frete_medio ?? 0),
   }));
 
-  const outliersPeso: OutlierPesoRow[] = ((outliersRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const outliersPeso: OutlierPesoRow[] = (padroesPeso.outliers_peso ?? []).map((r) => ({
     cliente: (r.cliente as string) ?? "—",
     peso: Number(r.peso ?? 0),
     frete: Number(r.frete ?? 0),
@@ -548,13 +542,13 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     mediana: Number(r.mediana ?? 0),
   }));
 
-  const prazoFrete: PrazoFreteRow[] = ((prazoFreteRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const prazoFrete: PrazoFreteRow[] = (padroesPeso.prazo_frete_medio ?? []).map((r) => ({
     prazo: Number(r.prazo),
     freteMedio: Number(r.frete_medio ?? 0),
     n: Number(r.n ?? 0),
   }));
 
-  const cubagemRows = (cubagemRes.data as Record<string, unknown>[]) ?? [];
+  const cubagemRows = padroesPeso.cubagem_custo ?? [];
   const cubagemCusto: CubagemCustoRow[] = cubagemRows.map((r) => ({
     faixa: String(r.faixa),
     n: Number(r.n ?? 0),
