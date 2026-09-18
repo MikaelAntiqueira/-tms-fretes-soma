@@ -63,6 +63,8 @@ interface BlocoRow {
   pesoFreteKg: number;
   volumes: number;
   nComVolume: number;
+  cubagemM3: number;
+  valorDeclarado: number | null;
   freteMinimoObservado: number | null;
   nClientesMinimo: number;
   valorMinimo: number | null;
@@ -142,6 +144,8 @@ async function getVisaoGeralData(mesEscolhido: string | null, diaEscolhido: stri
     pesoFreteKg: Number(r.peso_frete_kg ?? 0),
     volumes: Number(r.volumes ?? 0),
     nComVolume: Number(r.n_com_volume ?? 0),
+    cubagemM3: Number(r.cubagem_m3 ?? 0),
+    valorDeclarado: r.valor_declarado == null ? null : Number(r.valor_declarado),
     freteMinimoObservado: r.frete_minimo_observado == null ? null : Number(r.frete_minimo_observado),
     nClientesMinimo: Number(r.n_clientes_minimo ?? 0),
     valorMinimo: r.valor_minimo == null ? null : Number(r.valor_minimo),
@@ -169,6 +173,8 @@ function BlocoCard({ b, mes, dia }: { b: BlocoRow; mes: string; dia: string | nu
     pesoRealKg: b.pesoRealKg,
     volumes: b.volumes,
     nComVolume: b.nComVolume,
+    cubagemM3: b.cubagemM3,
+    valorDeclarado: b.valorDeclarado,
     ticketMedio: b.ticketMedio,
     freteMinimoObservado: b.freteMinimoObservado,
     nClientesMinimo: b.nClientesMinimo,

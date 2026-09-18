@@ -1232,9 +1232,24 @@ main.content.vg-main { padding: 14px 28px 18px; }
 }
 .vg-card:hover { box-shadow: var(--shadow-card); }
 .vg-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.vg-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.vg-card-name { font-size: 13.5px; font-weight: 700; margin-bottom: 2px; color: var(--text-primary); }
-.vg-card-value { font-family: var(--font-ibm-plex-mono), monospace; font-size: 21px; font-weight: 700; color: var(--text-primary); }
+.vg-card-name { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+/* Selos de destaque (2026-09-18, pedido da gestão via Mikael): Frete
+   total/Valor das notas (fatos, cinza neutro) + % frete/Custo por kg/Custo
+   por m³ (derivados, âmbar) — sempre em 1 linha na largura real do card
+   (2 colunas de grade), por isso a fonte menor que o antigo valor único. */
+.vg-card-selos { display: flex; gap: 8px; flex-wrap: wrap; }
+.vg-selo { flex: 1 1 0; min-width: 0; text-align: center; border-radius: 6px; padding: 3px 4px; }
+.vg-selo-total { background: var(--surface-card-alt); }
+.vg-selo-calculado { background: var(--warning-bg); }
+.vg-selo-label {
+  display: block; font-size: 8px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vg-selo-calculado .vg-selo-label { color: var(--warning); }
+.vg-selo-valor {
+  display: block; font-family: var(--font-ibm-plex-mono), monospace; font-size: 14px; font-weight: 700;
+  color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .vg-card-metrics { font-size: 11px; color: var(--text-secondary); border-collapse: collapse; }
 .vg-card-metrics td { padding: 0; line-height: 1.35; }
 .vg-card-metrics td:first-child { padding-right: 8px; }
