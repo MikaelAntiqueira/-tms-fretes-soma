@@ -486,11 +486,6 @@ export default async function OperacaoPage({
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Operação — Controle Operacional de Carregamento</h1>
-            <p>
-              Quem está carregando, quando (Meio-dia × Tarde) e em quais cidades — agregado sobre{" "}
-              <b>toda a base de contratações cruzadas a uma cotação</b>. Todas as seções já aceitam as
-              11 dimensões do motor de filtro global, com cascata de opções nos dropdowns.
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
             </nav>

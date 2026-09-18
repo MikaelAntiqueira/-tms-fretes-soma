@@ -813,12 +813,6 @@ export default async function FinanceiroPage({
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Financeiro</h1>
-            <p>
-              KPIs executivos, evolução mensal e decisões de contratação. As 4 sub-abas já aceitam as
-              11 dimensões do motor de filtro global (Mês, Transportadora Contratada, Região
-              Comercial, Tipo Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa
-              de Peso, Faixa de Cubagem).
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
               <Link href="/operacao">Operação</Link> · <Link href="/transportadoras">Transportadoras</Link>

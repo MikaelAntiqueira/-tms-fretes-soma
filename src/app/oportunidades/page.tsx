@@ -338,10 +338,6 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
           <div>
             <div className="eyebrow">TMS Fretes · grupo SOMA/RS</div>
             <h1>Oportunidades</h1>
-            <p className="desc" style={{ marginTop: 4, color: "var(--text-muted)", fontSize: 14 }}>
-              Classificação de oportunidades de economia por impacto.
-              Diferença ≠ erro — critério explícito.
-            </p>
             <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
           </div>
         </div>

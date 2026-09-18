@@ -286,14 +286,6 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Dados</h1>
-            <p>
-              Tabela detalhada, 1 linha por processo de cotação — busca por cliente, pedido, NF ou
-              romaneio, ordenação por coluna, paginação server-side (a mesma tabela "Dados"
-              do Artifact atual, agora lendo direto do Supabase). Já aceita as 11 dimensões do
-              motor de filtro global (Mês, Transportadora Contratada, Região Comercial, Tipo
-              Cliente, Romaneio, Escolheu a Mais Barata, Prazo, Cidade, Janela, Faixa de Peso,
-              Faixa de Cubagem).
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
             </nav>

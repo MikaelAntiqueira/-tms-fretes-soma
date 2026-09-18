@@ -795,10 +795,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Resumo do Dia — decisões de contratação</h1>
-            <p>
-              Fechamento do último dia com contratações registradas e comparadas a uma cotação.
-              Você pode escolher outro dia específico no seletor abaixo.
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
             </nav>

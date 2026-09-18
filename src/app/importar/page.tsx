@@ -47,12 +47,6 @@ export default async function ImportarPage() {
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Importar Dados</h1>
-            <p>
-              Atualiza cotações, ofertas, contratações, clientes e transportadoras a partir dos
-              arquivos gerados pelo <code>ATUALIZAR AUTOMATICO.bat</code>. Selecione a pasta{" "}
-              <code>codigo\</code> — o site acha sozinho os 3 arquivos que precisa lá dentro (não
-              a planilha <code>.xlsx</code> — ela não tem cubagem nem volumes).
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link>
             </nav>

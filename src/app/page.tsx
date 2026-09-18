@@ -220,7 +220,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Visão geral</h1>
-            <p>Quem está carregando agora, por transportadora e janela de contratação.</p>
           </div>
         </div>
       </header>

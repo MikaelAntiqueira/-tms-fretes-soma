@@ -425,14 +425,6 @@ export default async function TransportadorasPage({
           <div>
             <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
             <h1>Transportadoras &amp; Cidades</h1>
-            <p>
-              Comparação factual entre as 7 transportadoras, por Preço × Prazo, Região Comercial,
-              Cliente e Cidade — sobre <b>toda a base</b> (ofertas e contratações cruzadas a uma
-              cotação). As 5 sub-abas já aceitam as 11 dimensões do motor de filtro global (Mês,
-              Transportadora Contratada, Região Comercial, Tipo Cliente, Romaneio, Escolheu a Mais
-              Barata, Prazo, Cidade, Janela, Faixa de Peso, Faixa de Cubagem), com cascata de opções nos
-              dropdowns.
-            </p>
             <nav className="crumbs">
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
               <Link href="/operacao">Operação</Link>
