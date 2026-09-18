@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { FinanceiroTabs } from "./FinanceiroTabs";
 import { CotadoContratadoCharts } from "./CotadoContratadoCharts";
@@ -825,7 +824,6 @@ export default async function FinanceiroPage({
               <Link href="/operacao">Operação</Link> · <Link href="/transportadoras">Transportadoras</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

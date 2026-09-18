@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
@@ -804,7 +803,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               <Link href="/">← Visão Geral</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

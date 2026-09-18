@@ -1,6 +1,5 @@
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { Suspense } from "react";
 import { OportunidadesTabsClient } from "./OportunidadesTabsClient";
 import { parseMulti, clsDifSobreFrete, fmtBRL, fmtNum, fmtPct } from "@/lib/format";
@@ -282,7 +281,6 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
               <h1>Oportunidades</h1>
               <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
             </div>
-            <ThemeToggle />
           </div>
         </header>
         <main className="content">
@@ -346,7 +344,6 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
             </p>
             <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

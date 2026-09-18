@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ImportarClient } from "./ImportarClient";
 
 // Página "Importar Dados" — área administrativa pedida pelo Mikael
@@ -58,7 +57,6 @@ export default async function ImportarPage() {
               <Link href="/">← Visão Geral</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 
 // Página "Operação" (Controle Operacional de Carregamento), rota /operacao.
@@ -496,7 +495,6 @@ export default async function OperacaoPage({
               <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

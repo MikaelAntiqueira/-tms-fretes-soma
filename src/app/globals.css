@@ -389,29 +389,6 @@ main.content.wide {
   color: var(--text-primary);
 }
 
-.theme-toggle {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-}
-
-.theme-toggle button {
-  all: unset;
-  cursor: pointer;
-  font: 600 11px var(--font-ibm-plex-sans), sans-serif;
-  color: rgba(255, 255, 255, 0.85);
-  padding: 5px 10px;
-  border-radius: 99px;
-}
-
-.theme-toggle button.on {
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--brand-900);
-}
-
 footer.app-footer {
   padding: 18px 24px;
   border-top: 1px solid var(--border);
@@ -1006,15 +983,27 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   line-height: 1.5;
 }
 
-/* ---- indicador de sessão no rodapé da sidebar ---- */
-.sidebar-session {
+/* ---- rodapé da sidebar: indicador de sessão + alternador de tema ----
+   Antes o ThemeToggle era uma pílula "Claro/Automático/Escuro" repetida
+   no cabeçalho de cada página (ocupava espaço à toa, a pedido do Mikael
+   em 2026-09-18 virou 1 ícone só, aqui no rodapé da sidebar). */
+.sidebar-footer {
   padding: 12px 16px 16px;
   border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+}
+.sidebar.collapsed .sidebar-footer { justify-content: center; padding: 12px 8px 16px; }
+
+.sidebar-session {
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 11.5px;
-  flex: none;
+  min-width: 0;
 }
 .sidebar-session .who {
   color: var(--text-secondary);
@@ -1033,10 +1022,28 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 .sidebar-session .link-btn:hover { text-decoration: underline; }
 .sidebar.collapsed .sidebar-session { display: none; }
 
+.theme-toggle-btn {
+  all: unset;
+  cursor: pointer;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.theme-toggle-btn:hover { background: var(--surface-card-alt); color: var(--text-primary); }
+.theme-toggle-btn svg { width: 16px; height: 16px; }
+
 @media (max-width: 900px) {
   /* Mesma regra de .sidebar-stats acima: sidebar vira overlay em mobile —
      "collapsed" ali significa "mostrar tudo", não "recolhida". */
   .sidebar.collapsed .sidebar-session { display: flex; }
+  .sidebar.collapsed .sidebar-footer { justify-content: space-between; padding: 12px 16px 16px; }
 }
 
 /* ==========================================================================

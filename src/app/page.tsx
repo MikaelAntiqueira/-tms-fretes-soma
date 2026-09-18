@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { VisaoGeralCard, type VisaoGeralCardData } from "@/components/VisaoGeralCard";
 import { fmtBRL, fmtBRL2, fmtNum, fmtMes } from "@/lib/format";
@@ -223,7 +222,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
             <h1>Visão geral</h1>
             <p>Quem está carregando agora, por transportadora e janela de contratação.</p>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ComparativoCharts } from "./ComparativoCharts";
 import { TransportadorasTabs } from "./TransportadorasTabs";
 import { PrecoPrazoChart, type PrazoMedioRow } from "./PrecoPrazoChart";
@@ -439,7 +438,6 @@ export default async function TransportadorasPage({
               <Link href="/operacao">Operação</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

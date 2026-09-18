@@ -44,6 +44,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { SOMA_LOGO_DATA_URI } from "./soma-logo";
 import { SessionIndicator } from "./SessionIndicator";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface NavItem {
   href: string;
@@ -223,9 +224,13 @@ export function DashboardShell({ children, stats }: { children: ReactNode; stats
           })}
         </div>
 
-        {/* Indicador de sessão (Supabase Auth, [TASK-29] Fase 6) — ver
-            comentário no topo do arquivo. */}
-        <SessionIndicator />
+        {/* Indicador de sessão (Supabase Auth, [TASK-29] Fase 6) + alternador
+            de tema (ver comentário no topo do arquivo e em ThemeToggle.tsx) —
+            mesma linha no rodapé da sidebar. */}
+        <div className="sidebar-footer">
+          <SessionIndicator />
+          <ThemeToggle />
+        </div>
       </nav>
 
       <button

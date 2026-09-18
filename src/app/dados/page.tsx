@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref, parseMulti } from "@/lib/format";
 
@@ -299,7 +298,6 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
               <Link href="/">← Visão Geral</Link>
             </nav>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 
