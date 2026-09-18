@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { Suspense } from "react";
 import { OportunidadesTabsClient } from "./OportunidadesTabsClient";
@@ -274,15 +276,7 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
   if (erro) {
     return (
       <div className="app-shell">
-        <header className="app-header">
-          <div className="app-header-inner">
-            <div>
-              <div className="eyebrow">TMS Fretes · grupo SOMA/RS</div>
-              <h1>Oportunidades</h1>
-              <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
-            </div>
-          </div>
-        </header>
+        <PageHeader title="Oportunidades" crumbs={<Link href="/">← Visão Geral</Link>} />
         <main className="content">
           <div className="status-banner erro">
             <b>Não foi possível consultar o Supabase.</b>
@@ -333,15 +327,7 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
   // ── Render ────────────────────────────────────────────────────────────
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · grupo SOMA/RS</div>
-            <h1>Oportunidades</h1>
-            <nav className="crumbs"><a href="/">← Visão Geral</a></nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Oportunidades" crumbs={<Link href="/">← Visão Geral</Link>} />
 
       <main className="content wide">
         {!rows || rows.length === 0 ? (

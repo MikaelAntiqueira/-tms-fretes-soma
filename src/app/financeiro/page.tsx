@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { FinanceiroTabs } from "./FinanceiroTabs";
 import { CotadoContratadoCharts } from "./CotadoContratadoCharts";
@@ -808,18 +809,15 @@ export default async function FinanceiroPage({
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Financeiro</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
-              <Link href="/operacao">Operação</Link> · <Link href="/transportadoras">Transportadoras</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Financeiro"
+        crumbs={
+          <>
+            <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
+            <Link href="/operacao">Operação</Link> · <Link href="/transportadoras">Transportadoras</Link>
+          </>
+        }
+      />
 
       <main className="content wide">
         {erro ? (

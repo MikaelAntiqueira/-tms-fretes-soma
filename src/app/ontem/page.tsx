@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
@@ -790,17 +791,10 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Resumo do Dia — decisões de contratação</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Resumo do Dia — decisões de contratação"
+        crumbs={<Link href="/">← Visão Geral</Link>}
+      />
 
       <main className="content wide">
         {erro ? (

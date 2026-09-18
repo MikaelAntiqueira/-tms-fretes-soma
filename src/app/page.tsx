@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { VisaoGeralCard, type VisaoGeralCardData } from "@/components/VisaoGeralCard";
 import { fmtBRL, fmtBRL2, fmtNum, fmtMes } from "@/lib/format";
@@ -215,14 +216,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Vis
 
   return (
     <div className="app-shell">
-      <header className="app-header vg-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Visão geral</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Visão geral" heroClassName="vg-header" />
 
       <main className="content wide vg-main">
         {erro ? (

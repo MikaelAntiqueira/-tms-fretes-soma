@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { ComparativoCharts } from "./ComparativoCharts";
 import { TransportadorasTabs } from "./TransportadorasTabs";
@@ -420,18 +421,15 @@ export default async function TransportadorasPage({
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Transportadoras &amp; Cidades</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
-              <Link href="/operacao">Operação</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Transportadoras & Cidades"
+        crumbs={
+          <>
+            <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link> ·{" "}
+            <Link href="/operacao">Operação</Link>
+          </>
+        }
+      />
 
       <main className="content wide">
         {erro ? (

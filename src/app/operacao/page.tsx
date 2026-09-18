@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 
 // Página "Operação" (Controle Operacional de Carregamento), rota /operacao.
@@ -481,17 +482,14 @@ export default async function OperacaoPage({
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Operação — Controle Operacional de Carregamento</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Operação — Controle Operacional de Carregamento"
+        crumbs={
+          <>
+            <Link href="/">← Visão Geral</Link> · <Link href="/ontem">Ontem</Link>
+          </>
+        }
+      />
 
       <main className="content wide">
         {erro ? (

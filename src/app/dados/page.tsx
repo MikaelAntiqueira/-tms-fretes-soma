@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { FilterBar, type FilterDimension } from "@/components/FilterBar";
 import { fmtBRL2, fmtKg, fmtMes, fmtPct, clsDif, EscPill, buildHref, parseMulti } from "@/lib/format";
 
@@ -281,17 +282,7 @@ export default async function DadosPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Dados</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Dados" crumbs={<Link href="/">← Visão Geral</Link>} />
 
       <main className="content wide">
         {erro ? (

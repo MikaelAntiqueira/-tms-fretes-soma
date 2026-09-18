@@ -226,54 +226,69 @@ a {
   flex-direction: column;
 }
 
-.app-header {
-  background: linear-gradient(150deg, var(--brand-900), var(--brand-700) 65%, var(--brand-500));
-  color: #fff;
-  padding: 28px 24px;
+/* Cabeçalho em 2 faixas (2026-09-18, a pedido do Mikael — ver
+   src/components/PageHeader.tsx): uma faixa fina e fixa só com a marca
+   (mesma em toda página, "casa" do futuro seletor de filial/unidade) e,
+   embaixo, o título grande da página. Ambas centralizadas. */
+.app-header-brandbar {
+  background: var(--brand-900);
+  padding: 5px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.app-header-brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #fff;
+  border-radius: 5px;
+  padding: 2px 5px;
+  line-height: 0;
+}
+.app-header-brand-badge img { height: 12px; width: auto; display: block; }
+.app-header-brand-badge svg { width: 9px; height: 9px; color: var(--brand-900); }
+.app-header-brand-text {
+  font: 600 11px var(--font-ibm-plex-sans), sans-serif;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.app-header-inner {
+.app-header-hero {
+  background: linear-gradient(150deg, var(--brand-900), var(--brand-700) 65%, var(--brand-500));
+  color: #fff;
+  padding: 14px 24px;
+}
+
+.app-header-hero-inner {
   max-width: 960px;
   margin: 0 auto;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
 }
 
-.eyebrow {
-  font: 600 11px/1 var(--font-ibm-plex-sans), sans-serif;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.app-header h1 {
-  font-size: 24px;
+.app-header-hero h1 {
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  margin: 6px 0 4px;
+  margin: 0;
   color: #fff;
 }
 
-.app-header p {
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.85);
-  max-width: 58ch;
-  margin: 0;
+.app-header-hero nav.crumbs {
+  margin-top: 3px;
+  font-size: 11.5px;
 }
-
-.app-header nav.crumbs {
-  margin-top: 10px;
-  font-size: 12px;
-}
-.app-header nav.crumbs a {
+.app-header-hero nav.crumbs a {
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-weight: 600;
 }
-.app-header nav.crumbs a:hover {
+.app-header-hero nav.crumbs a:hover {
   text-decoration: underline;
 }
 
@@ -780,7 +795,7 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   transition: left 0.18s ease, transform 0.18s ease; box-shadow: var(--shadow-card);
 }
 .sidebar-collapse-btn svg { width: 13px; height: 13px; }
-.sidebar-collapse-btn.collapsed { transform: rotate(180deg); }
+.sidebar-collapse-btn.collapsed { left: 56px; transform: rotate(180deg); }
 
 .sidebar-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 8px 20px; display: flex; flex-direction: column; gap: 2px; }
 
@@ -834,8 +849,8 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
   .with-sidebar, .with-sidebar.collapsed { margin-left: 0; }
 
   /* Reserva espaço pro botão de menu (fixed, 42px + 14px de margem) não
-     ficar em cima do eyebrow/h1 do cabeçalho de cada página. */
-  .app-header-inner { padding-left: 46px; }
+     ficar em cima da faixa de marca do cabeçalho de cada página. */
+  .app-header-brandbar { padding-left: 46px; }
 }
 
 /* ==========================================================================
@@ -1151,9 +1166,8 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
    do topo, .vg-card ganhou um pouco mais de respiro de volta (o espaço
    que sobrou), sem comprometer o "cabe numa tela só" dos blocos.
    ========================================================================== */
-.app-header.vg-header { padding: 16px 24px; }
-.app-header.vg-header h1 { font-size: 19px; margin: 3px 0 2px; }
-.app-header.vg-header p { font-size: 12px; }
+.app-header-hero.vg-header { padding: 9px 24px; }
+.app-header-hero.vg-header h1 { font-size: 17px; }
 
 main.content.vg-main { padding: 14px 28px 18px; }
 

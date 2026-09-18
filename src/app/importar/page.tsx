@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/supabase-server";
+import { PageHeader } from "@/components/PageHeader";
 import { ImportarClient } from "./ImportarClient";
 
 // Página "Importar Dados" — área administrativa pedida pelo Mikael
@@ -42,17 +43,7 @@ export default async function ImportarPage() {
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-inner">
-          <div>
-            <div className="eyebrow">TMS Fretes · Grupo SOMA/RS</div>
-            <h1>Importar Dados</h1>
-            <nav className="crumbs">
-              <Link href="/">← Visão Geral</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Importar Dados" crumbs={<Link href="/">← Visão Geral</Link>} />
 
       <main className="content">
         <ImportarClient />
