@@ -70,6 +70,8 @@ interface OntemLinha {
   diferenca_pct: number | null;
   escolheu: "S" | "N" | "SC";
   janela: string | null;
+  nf: string | null;
+  endereco_entrega: string | null;
 }
 
 interface OntemCobertura {
@@ -595,6 +597,8 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
     diferenca_pct: r.diferenca_pct == null ? null : Number(r.diferenca_pct),
     escolheu: r.escolheu as "S" | "N" | "SC",
     janela: (r.janela as string) ?? null,
+    nf: (r.nf as string) ?? null,
+    endereco_entrega: (r.endereco_entrega as string) ?? null,
   }));
 
   const cobertura: OntemCobertura | null = coberturaRow
@@ -887,12 +891,14 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                       <th className="num">Diferença %</th>
                       <th>Escolheu a + barata?</th>
                       <th>Janela</th>
+                      <th>NF</th>
+                      <th>Endereço de entrega</th>
                     </tr>
                   </thead>
                   <tbody>
                     {linhas.length === 0 ? (
                       <tr>
-                        <td colSpan={10} style={{ color: "var(--text-muted)" }}>
+                        <td colSpan={12} style={{ color: "var(--text-muted)" }}>
                           Sem contratações neste dia.
                         </td>
                       </tr>
@@ -918,6 +924,8 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                               <EscPill e={r.escolheu} />
                             </td>
                             <td>{r.janela ?? "—"}</td>
+                            <td>{r.nf ?? "—"}</td>
+                            <td>{r.endereco_entrega ?? "—"}</td>
                           </tr>
                         );
                       })
