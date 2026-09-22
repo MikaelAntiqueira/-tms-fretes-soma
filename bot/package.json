@@ -1,0 +1,13 @@
+{
+  "name": "tms-telegram-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "dotenv": "^17.4.2",
+    "telegraf": "^4.15.0"
+  }
+}

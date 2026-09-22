@@ -46,10 +46,23 @@ const TRANSP_ORDER = [
   "Leomar",
   "Minuano",
   "LKW",
-  "B. Transportes",
 ];
 
 const CLASSIF_ORDER = ["vermelho", "laranja", "azul", "verde", "alerta"];
+
+// Ordem fixa (não alfabética) das faixas — mesmos rótulos de fn_faixa_peso/
+// fn_faixa_cubagem (supabase/migrations/2026091303_create_comparacoes_view.sql),
+// necessária porque a cascata desta página é calculada em JS sobre as
+// próprias linhas (não vem já ordenada de uma RPC, como em /financeiro).
+const FAIXA_PESO_ORDER = ["0–10 kg", "10–20 kg", "20–50 kg", "50–100 kg", "100–250 kg", "250+ kg", "Não informado"];
+const FAIXA_CUBAGEM_ORDER = ["<0,05 m³", "0,05–0,15 m³", "0,15–0,5 m³", "0,5–2 m³", "2+ m³", "Não informada"];
+function ordenarPorLista(valores: string[], ordem: string[]): string[] {
+  return [...valores].sort((a, b) => {
+    const ia = ordem.indexOf(a);
+    const ib = ordem.indexOf(b);
+    return (ia === -1 ? ordem.length : ia) - (ib === -1 ? ordem.length : ib);
+  });
+}
 
 const COLORS: Record<string, string> = {
   vermelho: "#ef4444",
@@ -89,6 +102,7 @@ export interface ComparacaoRow {
   classif: string | null;
   risco_prazo_alt: boolean;
   oportunidade_prazo: boolean;
+  romaneio: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +117,13 @@ type FiltrosOportunidades = {
   transportadoras: string[] | null;
   regioes: string[] | null;
   tipos: string[] | null;
+  romaneios: string[] | null;
+  escs: string[] | null;
+  prazos: number[] | null;
+  cidades: string[] | null;
+  janelas: string[] | null;
+  faixasPeso: string[] | null;
+  faixasCubagem: string[] | null;
 };
 
 // [FIX 2026-09-17] Cascata de opções — antes os 3 dropdowns dinâmicos (mês/
@@ -134,6 +155,27 @@ function passaFiltros(
   if (excluir !== "tipos" && filtros.tipos && filtros.tipos.length > 0) {
     if (!filtros.tipos.includes(row.tipo_cliente as string)) return false;
   }
+  if (excluir !== "romaneios" && filtros.romaneios && filtros.romaneios.length > 0) {
+    if (!filtros.romaneios.includes(row.romaneio as string)) return false;
+  }
+  if (excluir !== "escs" && filtros.escs && filtros.escs.length > 0) {
+    if (!filtros.escs.includes(row.esc as string)) return false;
+  }
+  if (excluir !== "prazos" && filtros.prazos && filtros.prazos.length > 0) {
+    if (!filtros.prazos.includes(row.prazo_contratado_dias as number)) return false;
+  }
+  if (excluir !== "cidades" && filtros.cidades && filtros.cidades.length > 0) {
+    if (!filtros.cidades.includes(row.cidade as string)) return false;
+  }
+  if (excluir !== "janelas" && filtros.janelas && filtros.janelas.length > 0) {
+    if (!filtros.janelas.includes(row.janela as string)) return false;
+  }
+  if (excluir !== "faixasPeso" && filtros.faixasPeso && filtros.faixasPeso.length > 0) {
+    if (!filtros.faixasPeso.includes(row.faixa_peso as string)) return false;
+  }
+  if (excluir !== "faixasCubagem" && filtros.faixasCubagem && filtros.faixasCubagem.length > 0) {
+    if (!filtros.faixasCubagem.includes(row.faixa_cubagem as string)) return false;
+  }
   return true;
 }
 
@@ -143,6 +185,13 @@ async function fetchComparacoes(filtros: FiltrosOportunidades): Promise<{
   opcoesMeses: string[];
   opcoesRegioes: string[];
   opcoesTipos: string[];
+  opcoesRomaneios: string[];
+  opcoesEsc: string[];
+  opcoesPrazos: number[];
+  opcoesCidades: string[];
+  opcoesJanelas: string[];
+  opcoesFaixasPeso: string[];
+  opcoesFaixasCubagem: string[];
 }> {
   const supabase = await createSupabaseServerClient();
 
@@ -202,6 +251,48 @@ async function fetchComparacoes(filtros: FiltrosOportunidades): Promise<{
       .map((row) => row.tipo_cliente as string | null)
       .filter((v): v is string => Boolean(v))
   )].sort();
+  const opcoesRomaneios = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "romaneios"))
+      .map((row) => row.romaneio as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesEsc = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "escs"))
+      .map((row) => row.esc as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesPrazos = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "prazos"))
+      .map((row) => row.prazo_contratado_dias as number | null)
+      .filter((v): v is number => v != null)
+  )].sort((a, b) => a - b);
+  const opcoesCidades = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "cidades"))
+      .map((row) => row.cidade as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesJanelas = [...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "janelas"))
+      .map((row) => row.janela as string | null)
+      .filter((v): v is string => Boolean(v))
+  )].sort();
+  const opcoesFaixasPeso = ordenarPorLista([...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "faixasPeso"))
+      .map((row) => row.faixa_peso as string | null)
+      .filter((v): v is string => Boolean(v))
+  )], FAIXA_PESO_ORDER);
+  const opcoesFaixasCubagem = ordenarPorLista([...new Set(
+    allRows
+      .filter((row) => passaFiltros(row, filtros, "faixasCubagem"))
+      .map((row) => row.faixa_cubagem as string | null)
+      .filter((v): v is string => Boolean(v))
+  )], FAIXA_CUBAGEM_ORDER);
 
   const rows: ComparacaoRow[] = filtered.map((r) => ({
     contratacao_id:            String(r.contratacao_id ?? ""),
@@ -229,9 +320,23 @@ async function fetchComparacoes(filtros: FiltrosOportunidades): Promise<{
     classif:                   (r.classif as string) ?? null,
     risco_prazo_alt:           Boolean(r.risco_prazo_alt),
     oportunidade_prazo:        Boolean(r.oportunidade_prazo),
+    romaneio:                  (r.romaneio as string) ?? null,
   }));
 
-  return { rows, totalCotacoes: totalCotacoes ?? 0, opcoesMeses, opcoesRegioes, opcoesTipos };
+  return {
+    rows,
+    totalCotacoes: totalCotacoes ?? 0,
+    opcoesMeses,
+    opcoesRegioes,
+    opcoesTipos,
+    opcoesRomaneios,
+    opcoesEsc,
+    opcoesPrazos,
+    opcoesCidades,
+    opcoesJanelas,
+    opcoesFaixasPeso,
+    opcoesFaixasCubagem,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -248,11 +353,19 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
   // src/lib/supabase-server.ts.
   await requireUser("/oportunidades");
   const sp = await searchParams;
-  const filtros = {
+  const prazosParam = parseMulti(sp.prazo);
+  const filtros: FiltrosOportunidades = {
     meses:        parseMulti(sp.mes),
     transportadoras: parseMulti(sp.transportadora),
     regioes:      parseMulti(sp.regiao),
     tipos:        parseMulti(sp.tipo),
+    romaneios:    parseMulti(sp.romaneio),
+    escs:         parseMulti(sp.esc),
+    prazos:       prazosParam ? prazosParam.map(Number) : null,
+    cidades:      parseMulti(sp.cidade),
+    janelas:      parseMulti(sp.janela),
+    faixasPeso:   parseMulti(sp.faixaPeso),
+    faixasCubagem: parseMulti(sp.faixaCubagem),
   };
 
   let rows: ComparacaoRow[] = [];
@@ -260,6 +373,13 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
   let opcoesMesesCascata: string[] = [];
   let opcoesRegioesCascata: string[] = [];
   let opcoesTiposCascata: string[] = [];
+  let opcoesRomaneiosCascata: string[] = [];
+  let opcoesEscCascata: string[] = [];
+  let opcoesPrazosCascata: number[] = [];
+  let opcoesCidadesCascata: string[] = [];
+  let opcoesJanelasCascata: string[] = [];
+  let opcoesFaixasPesoCascata: string[] = [];
+  let opcoesFaixasCubagemCascata: string[] = [];
   let erro: string | null = null;
 
   try {
@@ -269,6 +389,13 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
     opcoesMesesCascata = result.opcoesMeses;
     opcoesRegioesCascata = result.opcoesRegioes;
     opcoesTiposCascata = result.opcoesTipos;
+    opcoesRomaneiosCascata = result.opcoesRomaneios;
+    opcoesEscCascata = result.opcoesEsc;
+    opcoesPrazosCascata = result.opcoesPrazos;
+    opcoesCidadesCascata = result.opcoesCidades;
+    opcoesJanelasCascata = result.opcoesJanelas;
+    opcoesFaixasPesoCascata = result.opcoesFaixasPeso;
+    opcoesFaixasCubagemCascata = result.opcoesFaixasCubagem;
   } catch (e) {
     erro = e instanceof Error ? e.message : "Erro desconhecido ao consultar o Supabase.";
   }
@@ -318,6 +445,13 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
     { param: "transportadora", labelAll: "Todas as transportadoras", options: TRANSP_ORDER },
     { param: "regiao", labelAll: "Todas as regiões", options: opcoesRegioesCascata },
     { param: "tipo", labelAll: "Todos os tipos", options: opcoesTiposCascata },
+    { param: "romaneio", labelAll: "Todos os romaneios", options: opcoesRomaneiosCascata },
+    { param: "esc", labelAll: "Escolheu a mais barata: todos", options: opcoesEscCascata, format: "esc" },
+    { param: "prazo", labelAll: "Todos os prazos", options: opcoesPrazosCascata.map(String), format: "prazo" },
+    { param: "cidade", labelAll: "Todas as cidades", options: opcoesCidadesCascata },
+    { param: "janela", labelAll: "Todas as janelas", options: opcoesJanelasCascata },
+    { param: "faixaPeso", labelAll: "Todas as faixas de peso", options: opcoesFaixasPesoCascata },
+    { param: "faixaCubagem", labelAll: "Todas as faixas de cubagem", options: opcoesFaixasCubagemCascata },
   ];
 
   // Dados das abas (hidratados client-side via state)

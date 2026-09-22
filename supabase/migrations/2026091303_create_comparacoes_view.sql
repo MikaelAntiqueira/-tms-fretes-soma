@@ -27,6 +27,14 @@
 --
 -- Validado: 5.196 linhas, soma diffR>0 = R$ 45.957,95 — exatamente igual a
 -- v_ontem_comparacao (nenhuma segunda fonte de verdade divergente).
+--
+-- ATUALIZAÇÃO 2026-09-21 (fix_comparacoes_add_romaneio_dimensao_filtro):
+-- corrigido 'Público' → 'Publico' (sem acento, para bater com tipo_cliente
+-- gravado em `clientes`) e adicionada a coluna `romaneio` (de cotacoes),
+-- necessária para a página /oportunidades oferecer as mesmas 11 dimensões
+-- de filtro do restante do site. `romaneio` entra como ÚLTIMA coluna do
+-- SELECT final porque CREATE OR REPLACE VIEW não permite inserir colunas
+-- no meio da lista de uma view existente.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION fn_faixa_peso(p numeric)
@@ -129,6 +137,7 @@ base AS (
     fn_faixa_peso(ct.peso_real_kg)    AS faixa_peso,
     fn_faixa_cubagem(co.cubagem_m3)   AS faixa_cubagem,
     v.janela,
+    co.romaneio,
     v.melhor_cotacao     AS melhor_preco,
     tb.nome_curto        AS transportadora_mais_barata,
     v.diferenca_r        AS "diffR",
@@ -154,7 +163,7 @@ grupo_percentis AS (
     percentile_disc(0.75) WITHIN GROUP (ORDER BY "diffR") AS p75_r,
     percentile_disc(0.75) WITHIN GROUP (ORDER BY "diffP") AS p75_p
   FROM base
-  WHERE tipo_cliente IN ('Público', 'Privado')
+  WHERE tipo_cliente IN ('Publico', 'Privado')
     AND "diffR" IS NOT NULL AND "diffR" > 0
     AND "diffP" IS NOT NULL
   GROUP BY tipo_cliente
@@ -185,7 +194,7 @@ SELECT
   CASE
     WHEN b.esc = 'S' THEN 'verde'
     WHEN b.esc != 'N' THEN NULL
-    WHEN b.tipo_cliente NOT IN ('Público', 'Privado') THEN 'alerta'
+    WHEN b.tipo_cliente NOT IN ('Publico', 'Privado') THEN 'alerta'
     WHEN b."diffR" <= gp.p25_r AND b."diffP" <= gp.p25_p
       AND b."diffR" IS NOT NULL AND b."diffP" IS NOT NULL
       THEN 'azul'
@@ -198,6 +207,7 @@ SELECT
    AND b."diffR" IS NOT NULL AND b."diffR" > 0
    AND b.prazo_alternativa_dias IS NOT NULL
    AND b.prazo_alternativa_dias <= b.prazo_contratado_dias
-   AND b.transportadora_mais_barata != 'Leomar') AS oportunidade_prazo
+   AND b.transportadora_mais_barata != 'Leomar') AS oportunidade_prazo,
+  b.romaneio
 FROM base b
 LEFT JOIN grupo_percentis gp ON gp.tipo_cliente = b.tipo_cliente;

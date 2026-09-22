@@ -1,7 +1,136 @@
 # Pendências — TMS Fretes SOMA
 
-> Tarefas abertas e esperando ação. Última atualização: 2026-09-16.
+> Tarefas abertas e esperando ação. Última atualização: 2026-09-21.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
+
+## RESOLVIDO (2026-09-21) — 4 achados ALTO da `AUDITORIA_AG03.md` (A1-A4)
+
+Auditoria completa do projeto (app Next.js + bot Telegram novo em `bot/`)
+gerou `AUDITORIA_AG03.md` (21 achados: 3 CRÍTICO, 7 ALTO, 7 MÉDIO, 6 BAIXO).
+Os 3 CRÍTICO (token do bot logado, `handlerOntem` ausente, blacklist fraca do
+`/exec`) já estavam corrigidos no código antes desta sessão. Corrigidos agora
+os 4 primeiros ALTO:
+
+- **A1** — `/oportunidades` só implementava 4 das 11 dimensões do Filtro
+  Global (mes/transportadora/regiao/tipo). Adicionadas as 7 restantes
+  (romaneio/esc/prazo/cidade/janela/faixaPeso/faixaCubagem) em
+  `src/app/oportunidades/page.tsx`, incluindo ordenação fixa pra faixaPeso/
+  faixaCubagem (essa página computa cascatas em JS a partir da view
+  `comparacoes`, não via RPC, então não tinha ORDER BY do Postgres pra
+  herdar). Exigiu adicionar a coluna `romaneio` à view `comparacoes`
+  (migration `fix_comparacoes_add_romaneio_dimensao_filtro`, aplicada no
+  Supabase e replicada no arquivo consolidado local — ver A4). Validado com
+  `tsc --noEmit` limpo e `npm run build` completo sem erros.
+- **A2** — `/frete [peso]` do bot (`bot/src/handlers.js`) calculava uma
+  "estimativa" fake multiplicando `frete_medio` global por `peso/100`, sem
+  relação real com o histórico. Trocado por chamada à RPC
+  `transportadoras_comparativo` filtrada por `p_faixas_peso` (mesma faixa que
+  `fn_faixa_peso()` usa no banco) — agora mostra a média REAL contratada com
+  cada transportadora pra cotações na mesma faixa de peso, sem extrapolação.
+- **A3** — `TRANSP_ORDER` em `/oportunidades` incluía "B. Transportes", uma
+  transportadora fantasma que não existe no banco (só há 7 reais). Removida.
+- **A4** — o arquivo consolidado `supabase/migrations/2026091303_create_
+  comparacoes_view.sql` estava divergente do banco real: ainda tinha
+  `'Público'` (com acento, nunca bate com o `tipo_cliente` gravado) e não
+  tinha a coluna `romaneio` adicionada pelo A1. Reescrito pra refletir o
+  estado final do banco (confirmado via `pg_get_viewdef` ao vivo no projeto
+  `jpoizkylaffircimxzrq`).
+
+Pendentes da mesma auditoria (não mexidos ainda, ficaram pra depois por não
+serem ALTO/CRÍTICO ou por serem mudança arquitetural maior): A5 (`/oportunidades`
+busca as 5.194 linhas sem filtro nenhum, ineficiente), A6 (`loading.tsx`
+genérico), A7 (`VisaoGeralCard` manda parâmetros null desnecessários pra RPC),
++ 7 achados MÉDIO e 6 BAIXO — ver `AUDITORIA_AG03.md` na raiz do repo (ainda
+não commitado, assim como a pasta `bot/` inteira).
+
+## PLANEJADO, NÃO IMPLEMENTADO (2026-09-18) — Página `/usuarios` (Gestão de Usuários)
+
+Mikael pediu pra deixar isso pré-organizado pra desenvolver depois (explicitamente:
+"não implante nada para não dar erro") — ele viu essa funcionalidade em outro
+sistema (matrícula/nome/status "Ativo-Inativo") e quer o equivalente aqui, mas
+adaptado ao que este app realmente tem hoje.
+
+### Estado atual (levantado 2026-09-18, direto no Supabase)
+- Schema de usuário é bem mais simples do que o outro sistema que ele mostrou:
+  só existe a tabela `public.profiles (id uuid PK/FK auth.users(id) ON DELETE
+  CASCADE, role text CHECK IN ('admin','user'), criado_em timestamptz)`. **Não
+  tem** matrícula, nome, nem status ativo/inativo — essas 3 coisas precisam de
+  decisão + migration nova antes de implementar, se ele quiser (ver "Perguntas
+  em aberto" abaixo).
+- **2 usuários hoje**: `mikaelantiqueira@gmail.com` (role=admin) e
+  `transportes.rs@somahospitalar.com.br` (role=user).
+- **Não existe NENHUMA UI no app pra criar/gerenciar usuário** — hoje isso só
+  dá pra fazer direto no painel do Supabase (Auth → Users → convidar). O texto
+  da tela de login já reflete isso ("Use o link enviado por e-mail pelo
+  Supabase Auth — convite/recuperação de senha").
+- `role='admin'` só existe pro Mikael por decisão prévia ([DEC-29], D-12) — ver
+  seção "Auth e segurança" mais abaixo neste arquivo.
+- **Nenhum código deste projeto usa a `service_role` key do Supabase hoje**
+  (confirmado por grep — só existe um comentário em `ImportarClient.tsx`
+  dizendo explicitamente que ela NÃO é usada). Isso importa porque toda ação
+  de admin sobre outro usuário (convidar, resetar senha, remover) exige
+  `supabase.auth.admin.*`, que só funciona com a `service_role` key — e essa
+  chave **nunca pode rodar no navegador** (bypassa toda RLS do banco).
+
+### Proposta de página (rascunho, ainda não validado com o Mikael)
+Rota `/usuarios`, mesmo padrão de admin-only de `/importar` (`requireAdmin()`
++ item sempre visível no menu, mas a página redireciona pra `/` quem não é
+admin).
+
+- **Tabela**: E-mail · Papel (badge Admin/Usuário) · Criado em · Último
+  acesso · Confirmado? (`email_confirmed_at is not null`) — todos esses campos
+  já existem hoje, sem precisar de migration nenhuma (vêm de `auth.users` via
+  API admin + `profiles.role`).
+- **Ação "trocar papel"** (admin ⇄ usuário): só um `UPDATE profiles SET role=...`
+  — não precisa de service_role, RLS/policy de admin já bastaria (ainda não
+  auditado se `profiles` tem policy de UPDATE pra admin — checar antes de
+  implementar).
+- **Ação "convidar usuário"**: formulário com só o e-mail →
+  `supabase.auth.admin.inviteUserByEmail(email)` — dispara e-mail do próprio
+  Supabase, a pessoa define a senha pelo link (mesmo fluxo que já existe hoje
+  pra recuperação). O trigger `handle_new_user` (`SECURITY DEFINER`, já
+  existe) cria a linha em `profiles` automaticamente com `role='user'` —
+  o admin promove depois, se precisar, com a ação de trocar papel acima.
+- **Ação "reenviar link de redefinição de senha"**:
+  `supabase.auth.admin.generateLink({type: 'recovery', email})` (ou
+  `resetPasswordForEmail` do lado do client, que já é público).
+- **Ação "remover acesso"**: `supabase.auth.admin.deleteUser(id)` — o
+  `ON DELETE CASCADE` do FK `profiles.id → auth.users.id` já limpa o profile
+  sozinho, não precisa de lógica extra de limpeza.
+
+### Arquitetura necessária (não existe ainda, é a parte que mais precisa de cuidado)
+1. Nova env var **só de servidor** — `SUPABASE_SERVICE_ROLE_KEY` (sem prefixo
+   `NEXT_PUBLIC_`, nunca pode ir pro bundle do navegador). Configurar no
+   Vercel (Production + Preview) e no `.env.local` do Mikael — igual foi feito
+   antes pra outras env vars (ver `COMANDO_configurar_env_vars_vercel.md`
+   nesta mesma pasta, mesmo padrão de instrução passo a passo).
+2. Client novo **server-only**, ex. `src/lib/supabase-admin.ts` — só pode ser
+   importado de Server Actions/Route Handlers, nunca de um Client Component
+   (mesmo cuidado arquitetural já documentado em `FilterBar.tsx`/[D-30] sobre
+   nunca cruzar Server→Client com coisa que não devia).
+3. As 4 ações (convidar/trocar papel/resetar senha/remover) viram Server
+   Actions chamadas do formulário — nenhuma delas pode rodar
+   `createSupabaseBrowserClient()` com a service_role, só o client novo do
+   item 2, e só no servidor.
+
+### Perguntas em aberto (perguntar ao Mikael antes de implementar)
+- Quer adicionar **nome** e/ou **matrícula** de verdade (como no outro
+  sistema)? Se sim, precisa de migration em `profiles` (colunas novas) — hoje
+  o único "nome" disponível é o e-mail.
+- Quer um status **"Ativo/Inativo"** independente de excluir de fato? Hoje só
+  existe "existe ou não existe" (via `auth.users`) — um "inativo" de verdade
+  precisaria de uma coluna nova + travar login de quem está inativo (mudança
+  em `requireUser()`/`proxy.ts`, superfície de segurança maior, pensar com
+  calma).
+- Confirmar que só admin pode acessar `/usuarios` mesmo (nenhum meio-termo
+  tipo "usuário comum vê só o próprio perfil").
+
+### Não fazer sem o Mikael validar
+Não implementar nada disso ainda — ele pediu explicitamente pra só deixar
+organizado ("não implante nada para não dar erro"). Quando ele topar seguir,
+a ordem natural é: 1) decidir as 3 perguntas em aberto acima, 2) configurar a
+`SUPABASE_SERVICE_ROLE_KEY`, 3) implementar o client server-only, 4) as 4
+Server Actions, 5) a página em si.
 
 ## ✅ CORRIGIDO 2026-09-16 — faixa de peso do filtro global não seguia [DEC-26]
 
