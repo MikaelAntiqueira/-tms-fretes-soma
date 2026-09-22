@@ -532,11 +532,11 @@ function buildRadarData(raw: {
   return buildRadarCards(d2, d3, d4, d5, d6, prazoHist);
 }
 
-// [2026-09-22] Cache das 12 RPCs desta página (unstable_cache, revalidate 5
+// [2026-09-22] Cache das 13 RPCs desta página (unstable_cache, revalidate 5
 // min, tag "ontem-data") — mesmo achado e mesmo padrão de /financeiro,
 // /transportadoras e /operacao: cada RPC recalcula do zero a cada request
-// (página force-dynamic), e trocar de dia no DiaSelector refazia as 12
-// chamadas (2 de referência + 4 de ontem_* + 6 do Radar de Decisão) — mais
+// (página force-dynamic), e trocar de dia no DiaSelector refazia as 13
+// chamadas (2 de referência + 5 de ontem_* [incluindo + 1 do simulador de frete por romaneio] + 6 do Radar de Decisão) — mais
 // do que os "~7 RPCs" registrados em PENDENTES.md (contagem antiga, de antes
 // do Radar D5 existir, [D-33]). RLS de clientes/contratacoes/cotacoes/
 // ofertas/transportadoras é `true` para o role authenticated (sem filtro
