@@ -5,7 +5,7 @@ import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/PageHeader";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
-import type { RomaneioSimuladorRow } from "@/components/RomaneioSimulador";
+import { RomaneioSimulador, type RomaneioSimuladorRow } from "@/components/RomaneioSimulador";
 import { PrintButton } from "./PrintButton";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
@@ -843,6 +843,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
   const linhas = data?.linhas ?? [];
   const cobertura = data?.cobertura ?? null;
   const radarCardsList = data?.radar ?? [];
+  const simuladorData = data?.simulador ?? [];
 
   const pctBarata =
     kpis && kpis.n_escolheu_sim + kpis.n_escolheu_nao > 0
@@ -911,6 +912,8 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                 ))}
               </div>
             </section>
+
+            <RomaneioSimulador data={simuladorData} />
 
             <section className="bloc">
               <div className="bloc-head">
