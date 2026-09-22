@@ -165,6 +165,22 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    // Área administrativa (2026-09-21), mesmo critério de "Importar
+    // Dados" logo acima: visível no menu pra qualquer usuário logado, mas
+    // a página em si (requireAdmin()) só deixa passar role='admin'.
+    href: "/usuarios",
+    label: "Usuários",
+    title: "Usuários — papéis de acesso (admin/usuário)",
+    icon: (
+      <svg viewBox="0 0 24 24" {...ICON_STROKE}>
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3.5 19v-1a5.5 5.5 0 0 1 5.5-5.5" />
+        <circle cx="17" cy="9" r="2.6" />
+        <path d="M14.5 19v-1a4.2 4.2 0 0 1 6.8-3.3" />
+      </svg>
+    ),
+  },
 ];
 
 export function DashboardShell({ children, stats }: { children: ReactNode; stats?: ReactNode }) {
