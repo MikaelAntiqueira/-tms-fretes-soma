@@ -14,7 +14,7 @@ RETURNS TABLE (
   romaneio text,
   n_pedidos int,
   pedidos jsonb
-) LANGUAGE sql STABLE SET search_path = 'public'
+) LANGUAGE sql STABLE SECURITY INVOKER SET search_path = 'public'
 AS $$
   WITH pedidos_por_cotacao AS (
     SELECT
@@ -26,14 +26,17 @@ AS $$
       ctr.transportadora_id AS contratada_transportadora_id,
       t_contratada.nome_curto AS contratada_transportadora,
       ctr.valor_frete_contratado AS contratada_valor,
-      JSONB_AGG(
-        JSONB_BUILD_OBJECT(
-          'transportadora_id', o.transportadora_id,
-          'transportadora', t.nome_curto,
-          'preco_final', o.preco_final,
-          'prazo_dias', o.prazo_dias
-        )
-        ORDER BY o.preco_final ASC
+      COALESCE(
+        JSONB_AGG(
+          JSONB_BUILD_OBJECT(
+            'transportadora_id', o.transportadora_id,
+            'transportadora', t.nome_curto,
+            'preco_final', o.preco_final,
+            'prazo_dias', o.prazo_dias
+          )
+          ORDER BY o.preco_final ASC
+        ) FILTER (WHERE o.transportadora_id IS NOT NULL),
+        '[]'::jsonb
       ) AS ofertas
     FROM cotacoes cot
     INNER JOIN contratacoes ctr ON ctr.cotacao_id = cot.id
