@@ -52,10 +52,9 @@ function OfertaTableRow({ o, contratada, maisBarata }: { o: OfertaSimulada; cont
 function PedidoRow({ p }: { p: PedidoSimulado }) {
   return (
     <details className="sim-pedido">
-      <summary>
-        <span className="mono" style={{ minWidth: 700 }}>{p.pedido ?? "—"}</span>
-        {p.nf && `NF ${p.nf} · `}
-        {p.cliente} — {p.cidade ?? "—"}
+      <summary style={{ cursor: "pointer" }}>
+        <span style={{ fontWeight: 700 }}>{p.pedido ?? "—"}</span>
+        {" · "}NF {p.nf ?? "—"} · {p.cliente ?? "—"} · {p.cidade ?? "—"}
         {" · "}
         <span className="mono">{fmtBRL(p.contratada_valor)}</span> ({p.contratada_transportadora ?? "—"})
       </summary>
