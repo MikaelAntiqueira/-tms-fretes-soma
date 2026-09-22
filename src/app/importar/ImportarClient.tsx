@@ -107,7 +107,23 @@ export function ImportarClient() {
         lerJson<ContratadoRaw[]>(fContratados),
         lerJson<Record<string, CnpjInfo>>(fCnpj),
       ]);
+      // Validação de conteúdo antes da prévia — um JSON que faz parse mas
+      // está vazio/truncado (download interrompido, arquivo errado dentro da
+      // pasta) passaria batido e o Mikael só descobriria depois de confirmar
+      // a importação, já com cotações/ofertas/contratações substituídas.
+      if (!Array.isArray(cotacoes) || cotacoes.length === 0) {
+        throw new Error("cotacoes_reais.json não trouxe nenhuma cotação — arquivo vazio ou incompleto.");
+      }
+      if (!Array.isArray(contratados) || contratados.length === 0) {
+        throw new Error("contratados_reais.json não trouxe nenhuma contratação — arquivo vazio ou incompleto.");
+      }
+      if (typeof cnpjInfo !== "object" || cnpjInfo === null || Object.keys(cnpjInfo).length === 0) {
+        throw new Error("cnpj_to_info.json não trouxe nenhum cliente cadastrado — arquivo vazio ou incompleto.");
+      }
       const resultado = buildImportRows({ cotacoes, contratados, cnpjInfo });
+      if (resultado.cotacoes.length === 0 || resultado.contratacoes.length === 0) {
+        throw new Error("A prévia ficou com cotações ou contratações zeradas — confira os arquivos antes de confirmar.");
+      }
       setBuilt(resultado);
       setFase("previa");
     } catch (e) {

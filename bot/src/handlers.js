@@ -582,9 +582,31 @@ export async function handlerOntem(ctx) {
 }
 
 
+// Rate limit do /exec — janela deslizante por chat, em memória (processo
+// único do bot, não precisa de Redis pra isso). Sem isso, alguém com acesso
+// ao chat poderia disparar dezenas de execSync em sequência e esgotar CPU/IO
+// do PC do Mikael mesmo usando só comandos da whitelist (ex: /exec npm run build
+// repetido).
+const EXEC_RATE_LIMIT = 5; // execuções
+const EXEC_RATE_WINDOW_MS = 60 * 1000; // por minuto
+const execTimestamps = new Map(); // chatId -> number[]
+
+function excedeuRateLimit(chatId) {
+  const agora = Date.now();
+  const timestamps = (execTimestamps.get(chatId) || []).filter((t) => agora - t < EXEC_RATE_WINDOW_MS);
+  timestamps.push(agora);
+  execTimestamps.set(chatId, timestamps);
+  return timestamps.length > EXEC_RATE_LIMIT;
+}
+
 export async function handlerExec(ctx) {
   const args = ctx.message.text.split(' ');
   const comando = args.slice(1).join(' ');
+
+  if (comando && excedeuRateLimit(ctx.chat.id)) {
+    await ctx.reply(`🚫 Limite de ${EXEC_RATE_LIMIT} execuções por minuto atingido. Aguarde um pouco e tente de novo.`);
+    return;
+  }
 
   if (!comando) {
     await ctx.reply(

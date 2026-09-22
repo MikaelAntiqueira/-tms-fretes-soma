@@ -20,7 +20,6 @@
 // Toda agregação já vem pronta do servidor via RPCs `financeiro_peso_frete`/
 // `financeiro_prazo_frete_medio` (migration
 // `fn_financeiro_padroes_e_peso_cubagem`) — este componente só desenha.
-import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -32,6 +31,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar, Bubble } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, BubbleController, Tooltip);
 
@@ -47,34 +47,6 @@ const FALLBACK: Record<VarName, string> = {
   "--text-secondary": "#4f758e",
   "--border": "rgba(13, 36, 54, 0.12)",
 };
-
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
 
 function hexAlpha(hex: string, a: number): string {
   hex = hex.trim();
@@ -111,7 +83,7 @@ export interface PrazoFreteRow {
 }
 
 export function PesoCustoCharts({ pesoBins, prazoRows }: { pesoBins: PesoBinRow[]; prazoRows: PrazoFreteRow[] }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

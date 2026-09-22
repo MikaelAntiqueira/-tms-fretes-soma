@@ -20,7 +20,6 @@
 // reproduz o posicionamento inteligente esquerda/direita do plugin
 // original — é um texto fixo à direita do ponto, com contorno para
 // legibilidade nos 2 temas.
-import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   LinearScale,
@@ -31,6 +30,7 @@ import {
   type Plugin,
 } from "chart.js";
 import { Scatter } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(LinearScale, PointElement, Tooltip, ScatterController);
 
@@ -78,34 +78,6 @@ const CARRIER_VAR: Record<string, VarName> = {
   "São Miguel": "--t7",
 };
 
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
-
 function fmtBRL2(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -120,7 +92,7 @@ export interface PrazoMedioRow {
 }
 
 export function PrecoPrazoChart({ rows }: { rows: PrazoMedioRow[] }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

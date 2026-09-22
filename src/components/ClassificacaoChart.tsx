@@ -8,9 +8,10 @@
 // classificação" como substituto (ver comentário removido em
 // OportunidadesTabsClient.tsx: "sem Chart.js neste estágio").
 //
-// Mesmo padrão de leitura de tokens CSS em runtime (getComputedStyle) já
-// usado em CotadoContratadoCharts.tsx/RegiaoComercialChart.tsx — duplicado
-// aqui de propósito (ver comentário de TransportadorasTabs.tsx).
+// Leitura de tokens CSS em runtime (getComputedStyle) via hook compartilhado
+// `useThemeVars` (src/hooks/useThemeVars.ts) — [AUDITORIA_AG03.md M1,
+// 2026-09-21] extraído da duplicação que antes existia aqui e em mais ~8
+// componentes de gráfico.
 //
 // Cores e ordem das classes vêm de fora (props `order`/`colors`) — são as
 // MESMAS já usadas pela tabela "Contagem por classificação" e pelos badges
@@ -21,9 +22,9 @@
 // ver "Legenda" abaixo do gráfico) é mais específica que a descrição textual
 // do Artifact v42 — inventar um rótulo novo aqui divergiria da única fonte
 // de verdade que já existe no código.
-import { useEffect, useState } from "react";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, type ChartOptions } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -36,34 +37,6 @@ const FALLBACK: Record<VarName, string> = {
   "--text-secondary": "#4f758e",
   "--surface-card": "#ffffff",
 };
-
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
 
 function fmtNum(v: number): string {
   return v.toLocaleString("pt-BR");
@@ -93,7 +66,7 @@ export function ClassificacaoChart({
   order: string[];
   colors: Record<string, string>;
 }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
 

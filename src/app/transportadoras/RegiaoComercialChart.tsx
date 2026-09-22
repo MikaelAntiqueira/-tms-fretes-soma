@@ -12,10 +12,8 @@
 // desenha as N linhas (já cortadas em Top 15 por `page.tsx`), nunca agrega
 // linha crua.
 //
-// Mesmo padrão de leitura de tokens CSS em runtime (getComputedStyle) já
-// usado em ComparativoCharts.tsx/CotadoContratadoCharts.tsx — duplicado
-// aqui de propósito (ver comentário de TransportadorasTabs.tsx).
-import { useEffect, useState } from "react";
+// Leitura de tokens CSS em runtime (getComputedStyle) via hook compartilhado
+// `useThemeVars` (src/hooks/useThemeVars.ts).
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,6 +23,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -40,34 +39,6 @@ const FALLBACK: Record<VarName, string> = {
   "--border": "rgba(13, 36, 54, 0.12)",
 };
 
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
-
 function fmtBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
@@ -82,7 +53,7 @@ export interface RegiaoComercialRow {
 }
 
 export function RegiaoComercialChart({ rows }: { rows: RegiaoComercialRow[] }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

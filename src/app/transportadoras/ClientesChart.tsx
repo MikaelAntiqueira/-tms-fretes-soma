@@ -18,7 +18,7 @@
 // "Qtd. Processos" (número puro, toda a base de cotações do cliente,
 // cruzada ou não — ver comentário da migration
 // `fn_transportadoras_regiao_comercial_e_clientes`).
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,6 +28,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -40,34 +41,6 @@ const FALLBACK: Record<VarName, string> = {
   "--text-secondary": "#4f758e",
   "--border": "rgba(13, 36, 54, 0.12)",
 };
-
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
 
 function fmtBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -95,7 +68,7 @@ const METRIC_DEF: Record<Metric, { label: string; format: (v: number) => string;
 };
 
 export function ClientesChart({ rows }: { rows: ClienteMetricaRow[] }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const [metric, setMetric] = useState<Metric>("diffR");
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];

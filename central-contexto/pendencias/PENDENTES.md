@@ -20,7 +20,13 @@ os 4 primeiros ALTO:
   herdar). Exigiu adicionar a coluna `romaneio` à view `comparacoes`
   (migration `fix_comparacoes_add_romaneio_dimensao_filtro`, aplicada no
   Supabase e replicada no arquivo consolidado local — ver A4). Validado com
-  `tsc --noEmit` limpo e `npm run build` completo sem erros.
+  `tsc --noEmit` limpo e `npm run build` completo sem erros. **Confirmado
+  2026-09-21** em sessão autenticada real (Playwright + login do Mikael): os
+  11 botões de filtro renderizam na ordem certa, o dropdown de faixaPeso
+  mostra as 6 faixas na ordem fixa esperada, e selecionar `50–100 kg`
+  recalcula a página inteira de 5.194→787 processos (11,4% da base) com os
+  KPIs corretos (R$ 5.978 de diferença, 224 não escolheram a mais barata) —
+  confirma que o fix funciona ponta a ponta, não só no `tsc`/`build`.
 - **A2** — `/frete [peso]` do bot (`bot/src/handlers.js`) calculava uma
   "estimativa" fake multiplicando `frete_medio` global por `peso/100`, sem
   relação real com o histórico. Trocado por chamada à RPC
@@ -36,12 +42,89 @@ os 4 primeiros ALTO:
   estado final do banco (confirmado via `pg_get_viewdef` ao vivo no projeto
   `jpoizkylaffircimxzrq`).
 
-Pendentes da mesma auditoria (não mexidos ainda, ficaram pra depois por não
-serem ALTO/CRÍTICO ou por serem mudança arquitetural maior): A5 (`/oportunidades`
-busca as 5.194 linhas sem filtro nenhum, ineficiente), A6 (`loading.tsx`
-genérico), A7 (`VisaoGeralCard` manda parâmetros null desnecessários pra RPC),
-+ 7 achados MÉDIO e 6 BAIXO — ver `AUDITORIA_AG03.md` na raiz do repo (ainda
-não commitado, assim como a pasta `bot/` inteira).
+## RESOLVIDO (2026-09-21, mesmo dia) — restante da `AUDITORIA_AG03.md`: A7, M1-M7, B1, B3, B6
+
+Segunda rodada na mesma auditoria, cobrindo tudo que tinha ficado pra depois
+acima (exceto A5 e A6, ver por quê logo abaixo):
+
+- **A7** — `VisaoGeralCard.tsx` mandava `p_dia: data.dia` sempre pra RPC
+  `visao_geral_clientes_minimo`, mesmo quando `null` (a function já tem
+  default `p_dia date DEFAULT NULL` no Postgres — confirmado via
+  `pg_proc`/Supabase MCP). Trocado por spread condicional (`...(data.dia ? {
+  p_dia: data.dia } : {})`) — evita mandar um parâmetro null sem necessidade.
+- **M1** — `useThemeVars`/`readVars()` (leitura de variáveis CSS do tema,
+  claro/escuro) estava copiado e colado em 9 componentes de gráfico
+  (`OntemTendenciaChart`, `ClassificacaoChart`, `PrecoPrazoChart`,
+  `RegiaoComercialChart`, `ClientesChart`, `ComparativoCharts`,
+  `PadroesCharts`, `PesoCustoCharts`, `CotadoContratadoCharts`). Extraído
+  para hook compartilhado genérico `src/hooks/useThemeVars.ts` (recebe
+  `VAR_NAMES`/`FALLBACK` como parâmetros, já que cada gráfico lê um
+  subconjunto diferente de variáveis) — os 9 arquivos só mantêm seus próprios
+  `VAR_NAMES`/`FALLBACK` e chamam `useThemeVars(VAR_NAMES, FALLBACK)`.
+  Comentários desatualizados que justificavam a duplicação (em
+  `ClassificacaoChart.tsx`, `RegiaoComercialChart.tsx` e
+  `TransportadorasTabs.tsx`) foram atualizados. `tsc --noEmit` limpo.
+- **M2** — `/exec` do bot (`handlerExec`) não tinha limite de chamadas —
+  mesmo restrito à whitelist de comandos de leitura, dava pra esgotar CPU/IO
+  do PC do Mikael disparando várias execuções em sequência (ex: `npm run
+  build` repetido). Adicionado rate limit em memória: no máx. 5 execuções por
+  minuto por chat, janela deslizante.
+- **M3** — `SessionIndicator.tsx` não tinha try/catch — se
+  `createSupabaseBrowserClient()`/`getSession()` falhasse (env var ausente em
+  runtime, por exemplo), o indicador ficava travado pra sempre em "checando
+  sessão" (nem "Visitante" nem e-mail aparecia). Adicionado try/catch e
+  `.catch()`, caindo pra "Visitante" em vez de travar.
+- **M4** — `/importar` deixava confirmar a importação mesmo se
+  `cotacoes_reais.json`/`contratados_reais.json`/`cnpj_to_info.json`
+  estivessem vazios ou truncados (JSON válido, mas sem conteúdo real) — só
+  falharia depois de já ter começado a substituir cotações/ofertas/
+  contratações. Adicionada validação em `ImportarClient.tsx` logo após o
+  parse: rejeita arquivos com array/objeto vazio antes mesmo de chegar na
+  prévia.
+- **M5** — confirmado que `src/proxy.ts` existe (renomeado de
+  `middleware.ts` numa sessão anterior, [D-27]/[D-28]) — nenhuma ação
+  necessária.
+- **M6** — bot já loga os erros do `bot.catch` com `console.error` em
+  `bot/src/index.js` — nenhuma ação necessária.
+- **M7** — verificado que `OportunidadesTabsClient` não usa `Math.random`,
+  `Date.now()` nem `window` na renderização inicial (só dentro de
+  `useEffect`, via `useThemeVars`) — sem risco real de hydration mismatch,
+  nenhuma ação necessária.
+- **B1** — comentário desatualizado em `DashboardShell.tsx` sobre o item
+  "Oportunidades" (referenciava uma nota antiga sobre estar "desabilitada"
+  que não valia mais desde que a página foi portada) — simplificado.
+- **B3** — conferido via Vercel MCP: `NEXT_PUBLIC_SUPABASE_URL` e
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` estão configuradas para
+  Production/Preview/Development nos dois projetos Vercel (`tms-fretes-soma`
+  e `tms-fretes-soma-app`) — nenhuma ação necessária.
+- **B4, B5** — já estavam fechados pelo texto da própria auditoria (sem
+  import órfão de `src/lib/supabase.ts`; `outputFileTracingIncludes` é
+  monitorar upstream, não corrigir agora) — sem ação.
+- **B6** — comportamento de `maxMes == null` (base vazia) no filtro
+  `ecoFiltrado` de `src/app/financeiro/page.tsx` não estava documentado —
+  adicionada uma frase explicando que, nesse caso, a lista resultante fica
+  vazia mesmo (não é bug).
+- **Extra (achado ao rodar eslint, não da auditoria):** `/financeiro` ainda
+  tinha um card "Pendências desta etapa" visível pro Mikael dizendo que
+  `/oportunidades` só implementava 4 das 11 dimensões do Filtro Global — isso
+  ficou desatualizado assim que o A1 foi corrigido (mesma sessão, rodada
+  anterior). Card removido de `src/app/financeiro/page.tsx`.
+
+**Ficaram de fora de propósito:**
+- **A5** — `/oportunidades` busca as 5.194 linhas da view `comparacoes`
+  inteira (paginado em lotes de 1000) e só filtra depois, em JS, no servidor
+  (não é filtro client-side no navegador como a auditoria descreveu — mas o
+  efeito de desperdício é o mesmo: sempre busca a base inteira do Supabase a
+  cada carregamento, não só o recorte filtrado). Resolver de verdade exige
+  estender a view/criar uma RPC nova que aceite as 11 dimensões de filtro
+  como parâmetros — uma migration nova no Supabase de produção, não um ajuste
+  de código isolado. Não tentado nesta sessão por ser mudança de schema em
+  produção; requer decisão e teste dedicados.
+- **A6** — `loading.tsx` genérico (não diferencia "navegando" de
+  "filtrando") — a própria auditoria marca como "Opcional", não feito.
+
+Com isso, restam só A5 e A6 em aberto na `AUDITORIA_AG03.md`. O arquivo em si
+e a pasta `bot/` inteira continuam não commitados no git.
 
 ## PLANEJADO, NÃO IMPLEMENTADO (2026-09-18) — Página `/usuarios` (Gestão de Usuários)
 
@@ -290,13 +373,11 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       cruzada feita à parte. **Ainda falta** `/` (Visão Geral/home — mas é só uma página de
       prova de conceito, candidata a ser descontinuada, não um dos 5 painéis do dashboard
       original — decisão do Mikael antes de investir nisso).
-      **Não confirmado ainda**: não há como testar em produção com sessão autenticada sem
-      logar como o Mikael (ação que a sessão que implementou não pode executar) — falta ele
-      abrir `/dados`, aplicar um filtro (ex. um mês) e confirmar que a página carrega normalmente
-      e a tabela/paginação/ordenação reagem, sem repetir o "This page couldn't load" que já
-      aconteceu 4x nesta mesma área (ver [D-30] em FilterBar.tsx — causa era `format` como
-      função cruzando a fronteira Server→Client Component; esta rodada usa só chaves string,
-      igual ao fix documentado).
+      **Confirmado 2026-09-21** em sessão autenticada real (Playwright + login do Mikael,
+      dev server local): página carrega sem erro, 11/11 dropdowns presentes, filtro de mês
+      aplicado (`?mes=2026-01`) reduz corretamente de 5.194 para 146 processos, paginação
+      recalcula (104 → 3 páginas) e todas as linhas da tabela passam a mostrar `jan/2026` —
+      sem repetir o "This page couldn't load" das rodadas anteriores.
 - [x] ~~`/ontem` — seletor de dia específico~~ — **portado 2026-09-16** (commit `1aff130`,
       migration `fn_ontem_dias_disponiveis`). Mikael esclareceu que `/ontem` NÃO precisa do
       motor de filtro global de 11 dimensões (é um recorte de 1 dia só, filtrar por mês não faz
@@ -307,9 +388,12 @@ baseline já documentado logo abaixo (494.417,43 / 6.915 / 5.194 /
       segue a mesma convenção do FilterBar (nenhuma função cruza a fronteira Server→Client).
       Validado direto no Supabase com um dia arbitrário do meio da série (2026-07-16):
       ontem_kpis/ontem_contratacoes/radar_d2/d3/d4/d6 todos retornam dados consistentes.
-      **Não confirmado ainda** (mesma limitação do item acima — sem sessão autenticada pra
-      testar no navegador): falta o Mikael abrir `/ontem`, trocar o dia no seletor e confirmar
-      visualmente que os KPIs/Radar/tabela mudam e a página não quebra.
+      **Confirmado 2026-09-21** em sessão autenticada real (Playwright + login do Mikael,
+      dev server local): dia padrão carrega 27/08/2026 (mais recente); ao trocar pra
+      12/01/2026 no seletor a URL vira `?dia=2026-01-12` e KPIs (20→17 contratações, 45,0%→
+      0,0% cobertura), Radar de Decisão (cards trocam de CONCENTRAÇÃO/RECORRÊNCIA para FRETE
+      MÍNIMO FORA DO PARÂMETRO/ANOMALIA DE PREÇO) e a tabela de contratações do dia mudam
+      juntos, sem quebrar a página.
 - [x] ~~Validar as 11 dimensões campo a campo contra o Artifact original~~ — **11 de 11
       validadas, 2026-09-16** (Browser tool servindo `dashboard-restore-points/
       artifact-v40-2026-09-11.html` localmente + comparação direta com

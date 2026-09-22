@@ -26,7 +26,6 @@
 // `financeiro_diff_por_transportadora`/`financeiro_diff_por_tipo_cliente`
 // (migration `fn_financeiro_padroes_e_peso_cubagem`) — este componente só
 // desenha, não recalcula nenhuma regra de negócio.
-import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,6 +35,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -87,34 +87,6 @@ const CARRIER_VAR: Record<string, VarName> = {
   "São Miguel": "--t7",
 };
 
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
-
 function fmtBRL(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "—";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -159,7 +131,7 @@ export function PadroesCharts({
   transpRows: DiffPorTransportadoraRow[];
   tipoRows: DiffPorTipoRow[];
 }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

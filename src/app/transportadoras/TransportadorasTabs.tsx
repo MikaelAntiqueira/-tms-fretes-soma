@@ -6,10 +6,11 @@
 // mecanismo genérico de `src/app/financeiro/FinanceiroTabs.tsx`
 // (`.subnav`/`.subpage`, ver globals.css) — duplicado aqui em vez de
 // extraído para um componente compartilhado porque a instrução desta etapa
-// veda tocar em `src/app/financeiro/*`; a duplicação também já é o padrão
-// do repo para os hooks de gráfico (`useThemeVars` existe 2x, em
-// ComparativoCharts.tsx e CotadoContratadoCharts.tsx). Mesmo mecanismo:
-// dois blocos de conteúdo já vêm renderizados no servidor (dados buscados
+// veda tocar em `src/app/financeiro/*`. [AUDITORIA_AG03.md M1, 2026-09-21]:
+// a mesma duplicação nos hooks de gráfico (`useThemeVars`, antes copiado em
+// ~9 componentes) foi extraída para `src/hooks/useThemeVars.ts` — este
+// mecanismo de abas continua local de propósito, pelo motivo acima. Mesmo
+// mecanismo de tabs: dois blocos de conteúdo já vêm renderizados no servidor (dados buscados
 // uma vez, sem refetch ao trocar de aba) e este componente só decide qual
 // `<div className="subpage">` filho fica visível.
 import { Children, cloneElement, isValidElement, useState, type ReactElement, type ReactNode } from "react";

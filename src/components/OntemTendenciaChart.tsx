@@ -21,9 +21,9 @@
 // `fn_ontem_tendencia_15_dias`) — mesma fonte (`v_ontem_comparacao`) e
 // mesma regra de soma (só diferenca_r > 0) já usadas em `ontem_kpis`
 // (`diferenca_pos_sum`); este componente só desenha.
-import { useEffect, useState } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, type ChartOptions } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
@@ -38,34 +38,6 @@ const FALLBACK: Record<VarName, string> = {
   "--text-secondary": "#4f758e",
   "--border": "rgba(13, 36, 54, 0.12)",
 };
-
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
 
 function fmtBRL(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return "—";
@@ -83,7 +55,7 @@ export interface OntemTendenciaRow {
 }
 
 export function OntemTendenciaChart({ rows, diaRef }: { rows: OntemTendenciaRow[]; diaRef: string | null }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
   const fontFamily = "var(--font-ibm-plex-sans), system-ui, sans-serif";
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

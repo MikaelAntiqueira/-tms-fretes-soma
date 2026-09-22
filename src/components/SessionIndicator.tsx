@@ -18,12 +18,24 @@ export function SessionIndicator() {
   const [email, setEmail] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
     let active = true;
+    let supabase: ReturnType<typeof createSupabaseBrowserClient>;
+    try {
+      supabase = createSupabaseBrowserClient();
+    } catch {
+      // env vars ausentes em runtime — cai pra "Visitante" em vez de travar em "checando"
+      setEmail(null);
+      return;
+    }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) setEmail(data.session?.user.email ?? null);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (active) setEmail(data.session?.user.email ?? null);
+      })
+      .catch(() => {
+        if (active) setEmail(null);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user.email ?? null);

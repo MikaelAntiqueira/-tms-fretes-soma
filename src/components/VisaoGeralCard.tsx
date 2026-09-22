@@ -74,7 +74,7 @@ export function VisaoGeralCard({ data }: { data: VisaoGeralCardData }) {
         p_mes: data.mes,
         p_transportadora_id: data.transportadoraId,
         p_janela: data.janela,
-        p_dia: data.dia,
+        ...(data.dia ? { p_dia: data.dia } : {}),
       });
       if (error) throw new Error(error.message);
       setClientes((rows as ClienteMinimoRow[]) ?? []);

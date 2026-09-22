@@ -6,7 +6,6 @@
 // Reaproveita a paleta categórica --t1..--t7 já portada em globals.css,
 // lida em runtime via getComputedStyle (funciona nos 2 temas: claro/escuro
 // automático e o toggle manual data-theme, observado via MutationObserver).
-import { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,6 +16,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import { useThemeVars } from "@/hooks/useThemeVars";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -64,34 +64,6 @@ const CARRIER_VAR: Record<string, VarName> = {
   "São Miguel": "--t7",
 };
 
-function readVars(): Record<VarName, string> {
-  if (typeof window === "undefined") return FALLBACK;
-  const cs = getComputedStyle(document.documentElement);
-  const out = { ...FALLBACK };
-  for (const n of VAR_NAMES) {
-    const v = cs.getPropertyValue(n).trim();
-    if (v) out[n] = v;
-  }
-  return out;
-}
-
-function useThemeVars(): Record<VarName, string> {
-  const [vars, setVars] = useState<Record<VarName, string>>(FALLBACK);
-  useEffect(() => {
-    setVars(readVars());
-    const mo = new MutationObserver(() => setVars(readVars()));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setVars(readVars());
-    mq.addEventListener("change", onChange);
-    return () => {
-      mo.disconnect();
-      mq.removeEventListener("change", onChange);
-    };
-  }, []);
-  return vars;
-}
-
 export interface ComparativoChartRow {
   transportadora: string;
   qtd_cotada: number;
@@ -101,7 +73,7 @@ export interface ComparativoChartRow {
 }
 
 export function ComparativoCharts({ rows }: { rows: ComparativoChartRow[] }) {
-  const vars = useThemeVars();
+  const vars = useThemeVars(VAR_NAMES, FALLBACK);
 
   const tickColor = vars["--text-secondary"];
   const gridColor = vars["--border"];

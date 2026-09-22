@@ -725,7 +725,9 @@ export default async function FinanceiroPage({
   // Entra no gráfico se soma>0 OU se o mês é anterior ao mês mais recente da
   // base (mês em aberto com soma=0 fica de fora; mês fechado com soma=0
   // aparece como barra zerada). Comparação lexicográfica funciona porque o
-  // formato é sempre "AAAA-MM".
+  // formato é sempre "AAAA-MM". Se maxMes for null (base vazia), a 2ª
+  // condição nunca é satisfeita — só meses com soma>0 entrariam, o que
+  // nesse cenário é a lista vazia mesmo.
   const ecoFiltrado = evolucaoMensal.filter((r) => r.diffPosSum > 0 || (maxMes != null && r.mes < maxMes));
   const ecoLabels = ecoFiltrado.map((r) => fmtMes(r.mes));
   const ecoData = ecoFiltrado.map((r) => r.diffPosSum);
@@ -1032,25 +1034,6 @@ export default async function FinanceiroPage({
                 </section>
               )}
 
-              <section className="bloc">
-                <div className="card">
-                  <h3>Pendências desta etapa</h3>
-                  <div className="sub">próximas etapas do motor de filtro</div>
-                  <div className="alert-card info" style={{ marginTop: 8 }}>
-                    <ul>
-                      <li className="notes">
-                        <span className="name">Motor de filtro — /oportunidades com só 4 das 11 dimensões</span>
-                        <span className="num notes" style={{ color: "var(--text-muted)" }}>
-                          já tem cascata real e filtro funcionando (Mês/Transportadora/Região/Tipo); as
-                          outras 7 dimensões não foram estendidas pra cá ainda porque esta página filtra
-                          por `data_contratacao`, não `v_cotacao_filtros.mes` como as demais páginas — a
-                          semântica de "mês" precisaria ser decidida antes de unificar
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </section>
             </div>
 
             <div className="subpage" data-subpage="fin-cotado">
