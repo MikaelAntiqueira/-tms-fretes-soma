@@ -833,10 +833,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Radar de Decisão</h2>
-                <div className="desc">
-                  poucas situações que merecem atenção — cada card diz o que fazer, e apresenta
-                  evidência (não acusa erro)
-                </div>
               </div>
               <CoberturaNote c={cobertura} />
               {radarCardsList.length === 0 ? (
@@ -865,7 +861,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               <div className="bloc-head">
                 <div className="bloc-head-text">
                   <h2>Todas as contratações do dia</h2>
-                  <div className="desc">ordenado pela diferença em R$ — cor classifica a faixa, não julga a decisão</div>
                 </div>
                 {/* [Pedido do Mikael, 2026-09-21] "Baixar CSV" (todas as
                     notas do dia, sem filtro, via /ontem/csv) e "Baixar PDF"

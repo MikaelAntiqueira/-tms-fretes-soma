@@ -531,7 +531,6 @@ export default async function OperacaoPage({
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Quem está carregando</h2>
-                <div className="desc">1 linha por transportadora contratada, ordenado por frete contratado desc</div>
               </div>
               <div className="table-scroll">
                 <table className="data">
@@ -586,7 +585,6 @@ export default async function OperacaoPage({
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Distribuição do frete contratado</h2>
-                <div className="desc">participação de cada transportadora no total contratado &middot; reage ao filtro acima</div>
               </div>
               <div className="card">
                 <div className="dist-bar">
@@ -624,7 +622,6 @@ export default async function OperacaoPage({
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Meio-dia × Tarde</h2>
-                <div className="desc">janela de contratação, agrupada em 2 baldes fixos &middot; reage ao filtro acima</div>
               </div>
               {filtroAtivo && (
                 <div className="cov-note ok">
@@ -712,10 +709,6 @@ export default async function OperacaoPage({
             <section className="bloc">
               <div className="bloc-head">
                 <h2>Cidade × Transportadora</h2>
-                <div className="desc">
-                  top 15 cidades por frete contratado total (reage ao filtro acima) &middot; cor da diferença
-                  classifica a magnitude sobre o frete da própria linha, não julga a decisão
-                </div>
               </div>
               <div className="table-scroll">
                 <table className="data">

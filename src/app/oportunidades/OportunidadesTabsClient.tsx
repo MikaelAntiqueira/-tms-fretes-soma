@@ -111,7 +111,6 @@ function OportunidadesTabsClient({
             <section className="bloc" style={{ marginTop: 8 }}>
               <div className="bloc-head">
                 <h2>Classificação por impacto</h2>
-                <div className="desc">🟢 = mais barata · 🔵 = baixo · 🟠 = médio · 🔴 = alto · ⚠️ = amostra insuficiente</div>
               </div>
               <ClassificacaoChart
                 counts={{ verde: verdeCount, azul: azulCount, laranja: laranjaCount, vermelho: vermelhoCount, alerta: alertaCount }}
@@ -184,9 +183,6 @@ function OportunidadesTabsClient({
             <section className="bloc" style={{ marginTop: 16 }}>
               <div className="bloc-head">
                 <h2>Processos classificados — detalhe</h2>
-                <div className="desc">
-                  Ordenados por diferença (R$) decrescente — os maiores impactos primeiro.
-                </div>
               </div>
               <div className="tabela-pagina">
                 <table className="data" style={{ fontSize: 13 }}>
@@ -249,10 +245,6 @@ function OportunidadesTabsClient({
           <section className="bloc" style={{ marginTop: 8 }}>
             <div className="bloc-head">
               <h2>Clientes Prioritários — Maior Impacto</h2>
-              <div className="desc">
-                Lista de clientes com maior diferença acumulada (R$). Ordenação por impacto total — não por
-                número de processos.
-              </div>
             </div>
             <div className="tabela-pagina">
               <table className="data" style={{ fontSize: 13 }}>

@@ -505,13 +505,6 @@ export default async function TransportadorasPage({
 
                   <div className="bloc-head">
                     <h2>Comparativo</h2>
-                    <div className="desc">
-                      1 linha por transportadora, ordenado por Valor Contratado desc &middot; &quot;Qtd.
-                      Cotada&quot; conta toda oferta registrada (vencedora ou não); &quot;Vezes Mais
-                      Barata&quot; considera todas as cotações comparáveis da base (não só as
-                      contratadas) — [KPI-08]/[DEC-15]: é uma distribuição, as % somam 100% entre
-                      transportadoras, não é desempenho absoluto isolado.
-                    </div>
                   </div>
 
                   <div className="table-scroll">
@@ -553,7 +546,6 @@ export default async function TransportadorasPage({
                 <section className="bloc">
                   <div className="bloc-head">
                     <h2>Contratada × Mais Barata · Ranking</h2>
-                    <div className="desc">mesmos dados da tabela acima, em gráfico</div>
                   </div>
                   <ComparativoCharts
                     rows={rows.map((r) => ({
@@ -571,12 +563,6 @@ export default async function TransportadorasPage({
                 <section className="bloc" style={{ marginTop: 0 }}>
                   <div className="bloc-head">
                     <h2>Prazo Médio × Diferença Média por Transportadora</h2>
-                    <div className="desc">
-                      1 ponto por transportadora &middot; eixo X = prazo médio da oferta vencedora nas
-                      contratações cruzadas (dias); eixo Y = diferença média (mesma métrica de
-                      &quot;Diferença Média&quot; do Comparativo). Só entram transportadoras com as duas
-                      métricas disponíveis.
-                    </div>
                   </div>
                   {quadrante.length === 0 ? (
                     <div className="status-banner">
@@ -592,12 +578,6 @@ export default async function TransportadorasPage({
                 <section className="bloc">
                   <div className="bloc-head">
                     <h2>Perfil histórico de prazo por transportadora</h2>
-                    <div className="desc">
-                      Prazo da oferta vencedora nas contratações cruzadas, por transportadora
-                      contratada &middot; sempre a base completa (não depende de filtro) &middot;
-                      ordenado por mediana asc. Confiabilidade: N&ge;100 = boa; N entre 30 e 99 =
-                      amostra pequena; N&lt;30 = insuficiente para conclusão.
-                    </div>
                   </div>
                   {prazoHist.length === 0 ? (
                     <div className="status-banner">Sem dados de prazo histórico nos dados atuais.</div>
@@ -641,11 +621,6 @@ export default async function TransportadorasPage({
                 <section className="bloc" style={{ marginTop: 0 }}>
                   <div className="bloc-head">
                     <h2>Região Comercial</h2>
-                    <div className="desc">
-                      Top 15 de {fmtNum(regiaoTodas.length)} Regiões Comerciais por valor contratado —
-                      toda a base cruzada, sem filtro de dia. Região Comercial (`clientes.regiao_normalizada`)
-                      é a região de venda do cadastro, não é UF/estado ([DEC-02] FINAL).
-                    </div>
                   </div>
                   {regiaoTop15.length === 0 ? (
                     <div className="status-banner">Sem dados de Região Comercial nos dados atuais.</div>
@@ -661,11 +636,6 @@ export default async function TransportadorasPage({
                 <section className="bloc" style={{ marginTop: 0 }}>
                   <div className="bloc-head">
                     <h2>Clientes</h2>
-                    <div className="desc">
-                      Top 12 clientes pela métrica escolhida — Frete Contratado e Diferença Financeira
-                      Identificada olham só para a base cruzada (mesmo universo do Comparativo); Qtd. de
-                      Processos conta toda cotação do cliente, cruzada ou não.
-                    </div>
                   </div>
                   {clientes.length === 0 ? (
                     <div className="status-banner">Sem dados de Clientes nos dados atuais.</div>
@@ -681,10 +651,6 @@ export default async function TransportadorasPage({
                 <section className="bloc" style={{ marginTop: 0 }}>
                   <div className="bloc-head">
                     <h2>Cidades</h2>
-                    <div className="desc">
-                      Quais transportadoras carregaram para cada cidade — todas as cidades do recorte,
-                      ordenadas por frete.
-                    </div>
                   </div>
                   <div className="op-note" style={{ marginBottom: 16 }}>
                     Cidade = cidade do cadastro do cliente (pode diferir da cidade real de entrega).

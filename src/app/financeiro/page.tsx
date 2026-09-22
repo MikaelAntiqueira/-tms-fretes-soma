@@ -847,7 +847,6 @@ export default async function FinanceiroPage({
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>KPIs executivos</h2>
-                  <div className="desc">Base completa · sem comparação de período</div>
                 </div>
                 {covNote}
                 <div className="grid kpis">
@@ -865,7 +864,6 @@ export default async function FinanceiroPage({
               <section className="bloc">
                 <div className="bloc-head">
                   <h2>Meio-dia × Tarde</h2>
-                  <div className="desc">os dois momentos de contratação do dia — janela pela hora da contratação (estimativa)</div>
                 </div>
                 <div className="grid cols2-even">
                   {JANELAS_FIXAS.map((jname) => {
@@ -1040,10 +1038,6 @@ export default async function FinanceiroPage({
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>Evolução financeira mensal</h2>
-                  <div className="desc">
-                    Frete contratado x melhor cotação disponível · diferença financeira identificada por mês ·
-                    reage ao filtro acima
-                  </div>
                 </div>
                 {covNote}
                 <CotadoContratadoCharts
@@ -1062,10 +1056,6 @@ export default async function FinanceiroPage({
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>Padrões da diferença financeira</h2>
-                  <div className="desc">
-                    Onde a diferença financeira se concentra — diferença observada, não erro nem economia perdida; a
-                    correlação não confirma motivo. Reage ao filtro acima.
-                  </div>
                 </div>
                 <PadroesCharts
                   prazoRows={diffPorPrazo}
@@ -1081,9 +1071,6 @@ export default async function FinanceiroPage({
               <section className="bloc" style={{ marginTop: 0 }}>
                 <div className="bloc-head">
                   <h2>Peso, Cubagem &amp; Custo</h2>
-                  <div className="desc">
-                    Relação entre peso, cubagem, prazo contratado e valor do frete · reage ao filtro acima
-                  </div>
                 </div>
                 <PesoCustoCharts pesoBins={pesoBins} prazoRows={prazoFrete} />
 
@@ -1130,7 +1117,6 @@ export default async function FinanceiroPage({
               <section className="bloc">
                 <div className="bloc-head">
                   <h2>Cubagem e custo unitário</h2>
-                  <div className="desc">Perfil de carga por faixa e custo por kg / por m³ no recorte atual</div>
                 </div>
                 <div className="grid op-kpis" style={{ marginBottom: 14 }}>
                   <div className="kpi">

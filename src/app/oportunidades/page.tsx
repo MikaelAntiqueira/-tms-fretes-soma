@@ -479,7 +479,6 @@ export default async function OportunidadesPage({ searchParams }: PageProps) {
             <section className="bloc" style={{ marginTop: 16 }}>
               <div className="bloc-head">
                 <h2>KPIs de Oportunidade</h2>
-                <div className="desc">Base completa · sem comparação de período</div>
               </div>
               <div className="grid kpis">
                 <div className="card kpi">
