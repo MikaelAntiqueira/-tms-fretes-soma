@@ -884,6 +884,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                   <thead>
                     <tr>
                       <th>Romaneio</th>
+                      <th>NF</th>
                       <th>Cliente</th>
                       <th>Cidade</th>
                       <th>Transportadora contratada</th>
@@ -893,7 +894,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                       <th className="num">Diferença %</th>
                       <th>Escolheu a + barata?</th>
                       <th>Janela</th>
-                      <th>NF</th>
                       <th>Endereço de entrega</th>
                     </tr>
                   </thead>
@@ -911,6 +911,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                         return (
                           <tr key={i}>
                             <td>{r.romaneio ?? "—"}</td>
+                            <td>{r.nf ?? "—"}</td>
                             <td>{r.cliente ?? "—"}</td>
                             <td>{r.cidade ?? "—"}</td>
                             <td>{r.transportadora ?? "—"}</td>
@@ -926,7 +927,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                               <EscPill e={r.escolheu} />
                             </td>
                             <td>{r.janela ?? "—"}</td>
-                            <td>{r.nf ?? "—"}</td>
                             <td>{r.endereco_entrega ?? "—"}</td>
                           </tr>
                         );

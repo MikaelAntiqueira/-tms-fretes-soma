@@ -61,6 +61,7 @@ export async function GET(request: Request) {
 
   const header = [
     "Romaneio",
+    "NF",
     "Cliente",
     "Cidade",
     "Transportadora contratada",
@@ -70,7 +71,6 @@ export async function GET(request: Request) {
     "Diferenca %",
     "Escolheu a mais barata",
     "Janela",
-    "NF",
     "Endereco de entrega",
   ];
 
@@ -79,6 +79,7 @@ export async function GET(request: Request) {
     const diferencaPct = r.diferenca_pct == null ? null : Number(r.diferenca_pct) * 100;
     return [
       csvField(r.romaneio as string | null),
+      csvField(r.nf as string | null),
       csvField(r.cliente as string | null),
       csvField(r.cidade as string | null),
       csvField(r.transportadora as string | null),
@@ -88,7 +89,6 @@ export async function GET(request: Request) {
       csvNum(diferencaPct, 1),
       csvField(fmtEscolheuLabel(String(r.escolheu ?? ""))),
       csvField(r.janela as string | null),
-      csvField(r.nf as string | null),
       csvField(r.endereco_entrega as string | null),
     ].join(";");
   });
