@@ -42,8 +42,8 @@ function OfertaTableRow({ o, contratada, maisBarata }: { o: OfertaSimulada; cont
       <td className="num">{fmtBRL(o.preco_final)}</td>
       <td className="num">{o.prazo_dias != null ? `${fmtNum(o.prazo_dias)}d` : "—"}</td>
       <td>
-        {contratada && <span className="azul">Contratada</span>}{" "}
-        {maisBarata && <span className="barata">mais barata</span>}
+        {contratada && <span className="pill azul">Contratada</span>}{" "}
+        {maisBarata && <span className="pill s">Mais barata</span>}
       </td>
     </tr>
   );
@@ -79,7 +79,7 @@ function PedidoRow({ p }: { p: PedidoSimulado }) {
                   o={o}
                   contratada={o.transportadora_id === p.contratada_transportadora_id}
                   maisBarata={i === 0}
-                  key={o.transportadora_id}
+                  key={`${o.transportadora_id}-${i}`}
                 />
               ))}
             </tbody>

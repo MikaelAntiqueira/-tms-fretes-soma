@@ -584,6 +584,9 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 /* ---- Estado vazio do Radar de Decisão ("dentro do padrão neste dia") ---- */
 .sim-empty { text-align: center; padding: 30px 18px; color: var(--text-muted); font-size: 12.5px; line-height: 1.6; }
 .sim-empty b { color: var(--text-primary); }
+.sim-pedido { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.sim-pedido:last-child { border-bottom: none; }
+.sim-pedido summary:hover { color: var(--brand-700); }
 
 @media (max-width: 640px) {
   section.bloc { margin-top: 24px; }
