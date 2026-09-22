@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/PageHeader";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
+import type { RomaneioSimuladorRow } from "@/components/RomaneioSimulador";
 import { PrintButton } from "./PrintButton";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
@@ -182,6 +184,7 @@ interface OntemData {
   cobertura: OntemCobertura | null;
   radar: RadarCardData[];
   tendencia: OntemTendenciaRow[];
+  simulador: RomaneioSimuladorRow[];
 }
 
 /** Extrai "?dia=AAAA-MM-DD" da URL — só o formato; a validação contra a
@@ -449,26 +452,24 @@ function buildRadarCards(
   return out;
 }
 
-async function getRadarData(ref: string): Promise<RadarCardData[]> {
-  const supabase = await createSupabaseServerClient();
-  const [prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res] = await Promise.all([
-    supabase.rpc("radar_prazo_hist"),
-    supabase.rpc("radar_d2", { p_dia: ref }),
-    supabase.rpc("radar_d3", { p_dia: ref }),
-    supabase.rpc("radar_d4", { p_dia: ref }),
-    supabase.rpc("radar_d5", { p_dia: ref }),
-    supabase.rpc("radar_d6", { p_dia: ref }),
-  ]);
-  for (const res of [prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res]) {
-    if (res.error) throw new Error(res.error.message);
-  }
-
+// [2026-09-22] Pura (sem chamada de rede) — extraída da antiga getRadarData
+// pra permitir cachear as 6 chamadas .rpc() do Radar junto com as 4 de
+// ontem_* num único unstable_cache (ver fetchOntemDiaRpcs abaixo). Só faz o
+// mapeamento/scoring sobre os dados brutos já buscados.
+function buildRadarData(raw: {
+  prazo: unknown;
+  d2: unknown;
+  d3: unknown;
+  d4: unknown;
+  d5: unknown;
+  d6: unknown;
+}): RadarCardData[] {
   const prazoHist = new Map<string, number | null>();
-  for (const r of (prazoRes.data as Record<string, unknown>[]) ?? []) {
+  for (const r of (raw.prazo as Record<string, unknown>[]) ?? []) {
     prazoHist.set(r.transportadora as string, r.mediana == null ? null : Number(r.mediana));
   }
 
-  const d2: RadarD2Row[] = ((d2Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const d2: RadarD2Row[] = ((raw.d2 as Record<string, unknown>[]) ?? []).map((r) => ({
     romaneio: (r.romaneio as string) ?? null,
     cidade: (r.cidade as string) ?? null,
     cliente: (r.cliente as string) ?? null,
@@ -482,7 +483,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     prazo_barata: r.prazo_barata == null ? null : Number(r.prazo_barata),
   }));
 
-  const d5: RadarD5Row[] = ((d5Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const d5: RadarD5Row[] = ((raw.d5 as Record<string, unknown>[]) ?? []).map((r) => ({
     romaneio: (r.romaneio as string) ?? null,
     cidade: (r.cidade as string) ?? null,
     cliente: (r.cliente as string) ?? null,
@@ -492,7 +493,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     diferenca_r: Number(r.diferenca_r ?? 0),
   }));
 
-  const d3: RadarD3Row[] = ((d3Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const d3: RadarD3Row[] = ((raw.d3 as Record<string, unknown>[]) ?? []).map((r) => ({
     cliente: (r.cliente as string) ?? null,
     cidade: (r.cidade as string) ?? null,
     transportadora_contratada: (r.transportadora_contratada as string) ?? null,
@@ -503,7 +504,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     drill: toDrillRows(r.drill),
   }));
 
-  const d4: RadarD4Row[] = ((d4Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const d4: RadarD4Row[] = ((raw.d4 as Record<string, unknown>[]) ?? []).map((r) => ({
     cidade: (r.cidade as string) ?? null,
     top_transportadora: (r.top_transportadora as string) ?? null,
     n: Number(r.n ?? 0),
@@ -513,7 +514,7 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
     drill: toDrillRows(r.drill),
   }));
 
-  const d6: RadarD6Row[] = ((d6Res.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const d6: RadarD6Row[] = ((raw.d6 as Record<string, unknown>[]) ?? []).map((r) => ({
     romaneio: (r.romaneio as string) ?? null,
     cidade: (r.cidade as string) ?? null,
     cliente: (r.cliente as string) ?? null,
@@ -531,16 +532,70 @@ async function getRadarData(ref: string): Promise<RadarCardData[]> {
   return buildRadarCards(d2, d3, d4, d5, d6, prazoHist);
 }
 
-async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
-  const supabase = await createSupabaseServerClient();
+// [2026-09-22] Cache das 12 RPCs desta página (unstable_cache, revalidate 5
+// min, tag "ontem-data") — mesmo achado e mesmo padrão de /financeiro,
+// /transportadoras e /operacao: cada RPC recalcula do zero a cada request
+// (página force-dynamic), e trocar de dia no DiaSelector refazia as 12
+// chamadas (2 de referência + 4 de ontem_* + 6 do Radar de Decisão) — mais
+// do que os "~7 RPCs" registrados em PENDENTES.md (contagem antiga, de antes
+// do Radar D5 existir, [D-33]). RLS de clientes/contratacoes/cotacoes/
+// ofertas/transportadoras é `true` para o role authenticated (sem filtro
+// por usuário), então o resultado é idêntico pra qualquer usuário logado.
+// Client Supabase criado FORA dos 2 callbacks cacheados abaixo — dentro
+// deles só rodam .rpc(), sem cookies()/headers().
+async function fetchOntemReferenciaRpcs(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>) {
   const [refRes, diasRes] = await Promise.all([
     supabase.rpc("ontem_dia_referencia"),
     supabase.rpc("ontem_dias_disponiveis"),
   ]);
   if (refRes.error) throw new Error(refRes.error.message);
   if (diasRes.error) throw new Error(diasRes.error.message);
-  const diaMaisRecente = (refRes.data as string | null) ?? null;
-  const diasDisponiveis = ((diasRes.data as Record<string, unknown>[]) ?? []).map((r) => String(r.dia));
+  return { diaMaisRecente: refRes.data, diasDisponiveis: diasRes.data };
+}
+
+async function fetchOntemDiaRpcs(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, ref: string) {
+  const [kpisRes, linhasRes, coberturaRes, tendenciaRes, prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res, simuladorRes] =
+    await Promise.all([
+      supabase.rpc("ontem_kpis", { p_dia: ref }),
+      supabase.rpc("ontem_contratacoes", { p_dia: ref }),
+      supabase.rpc("ontem_cobertura", { p_dia: ref }),
+      supabase.rpc("ontem_tendencia_15_dias"),
+      supabase.rpc("radar_prazo_hist"),
+      supabase.rpc("radar_d2", { p_dia: ref }),
+      supabase.rpc("radar_d3", { p_dia: ref }),
+      supabase.rpc("radar_d4", { p_dia: ref }),
+      supabase.rpc("radar_d5", { p_dia: ref }),
+      supabase.rpc("radar_d6", { p_dia: ref }),
+      supabase.rpc("ontem_romaneio_simulador", { p_dia: ref }),
+    ]);
+  for (const res of [kpisRes, linhasRes, coberturaRes, tendenciaRes, prazoRes, d2Res, d3Res, d4Res, d5Res, d6Res, simuladorRes]) {
+    if (res.error) throw new Error(res.error.message);
+  }
+  return {
+    kpis: kpisRes.data,
+    linhas: linhasRes.data,
+    cobertura: coberturaRes.data,
+    tendencia: tendenciaRes.data,
+    prazo: prazoRes.data,
+    d2: d2Res.data,
+    d3: d3Res.data,
+    d4: d4Res.data,
+    d5: d5Res.data,
+    d6: d6Res.data,
+    simulador: simuladorRes.data,
+  };
+}
+
+async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
+  const supabase = await createSupabaseServerClient();
+  const getCachedReferencia = unstable_cache(
+    () => fetchOntemReferenciaRpcs(supabase),
+    ["ontem-referencia-rpcs"],
+    { revalidate: 300, tags: ["ontem-data"] }
+  );
+  const { diaMaisRecente: diaMaisRecenteRaw, diasDisponiveis: diasDisponiveisRaw } = await getCachedReferencia();
+  const diaMaisRecente = (diaMaisRecenteRaw as string | null) ?? null;
+  const diasDisponiveis = ((diasDisponiveisRaw as Record<string, unknown>[]) ?? []).map((r) => String(r.dia));
   // Só aceita o dia escolhido na URL se ele realmente tem contratação
   // cruzada — senão cai no padrão (último dia), silenciosamente, em vez de
   // mostrar um painel vazio pra um dia inválido/digitado à mão na URL.
@@ -556,22 +611,27 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
       cobertura: null,
       radar: [],
       tendencia: [],
+      simulador: [],
     };
   }
 
-  const [kpisRes, linhasRes, coberturaRes, tendenciaRes, radar] = await Promise.all([
-    supabase.rpc("ontem_kpis", { p_dia: ref }),
-    supabase.rpc("ontem_contratacoes", { p_dia: ref }),
-    supabase.rpc("ontem_cobertura", { p_dia: ref }),
-    supabase.rpc("ontem_tendencia_15_dias"),
-    getRadarData(ref),
-  ]);
-  for (const res of [kpisRes, linhasRes, coberturaRes, tendenciaRes]) {
-    if (res.error) throw new Error(res.error.message);
-  }
+  const getCachedDia = unstable_cache(
+    (r: string) => fetchOntemDiaRpcs(supabase, r),
+    ["ontem-dia-rpcs"],
+    { revalidate: 300, tags: ["ontem-data"] }
+  );
+  const bundle = await getCachedDia(ref);
+  const radar = buildRadarData({
+    prazo: bundle.prazo,
+    d2: bundle.d2,
+    d3: bundle.d3,
+    d4: bundle.d4,
+    d5: bundle.d5,
+    d6: bundle.d6,
+  });
 
-  const kpisRow = (kpisRes.data as Record<string, unknown>[])?.[0];
-  const coberturaRow = (coberturaRes.data as Record<string, unknown>[])?.[0];
+  const kpisRow = (bundle.kpis as Record<string, unknown>[])?.[0];
+  const coberturaRow = (bundle.cobertura as Record<string, unknown>[])?.[0];
 
   const kpis: OntemKpis | null = kpisRow
     ? {
@@ -587,7 +647,7 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
       }
     : null;
 
-  const linhas: OntemLinha[] = ((linhasRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const linhas: OntemLinha[] = ((bundle.linhas as Record<string, unknown>[]) ?? []).map((r) => ({
     romaneio: (r.romaneio as string) ?? null,
     cliente: (r.cliente as string) ?? null,
     cidade: (r.cidade as string) ?? null,
@@ -615,12 +675,34 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
       }
     : null;
 
-  const tendencia: OntemTendenciaRow[] = ((tendenciaRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const tendencia: OntemTendenciaRow[] = ((bundle.tendencia as Record<string, unknown>[]) ?? []).map((r) => ({
     dia: r.dia as string,
     soma_diff_pos: Number(r.soma_diff_pos ?? 0),
   }));
 
-  return { ref, diaMaisRecente, diasDisponiveis, kpis, linhas, cobertura, radar, tendencia };
+  const simulador: RomaneioSimuladorRow[] = ((bundle.simulador as Record<string, unknown>[]) ?? []).map((r) => ({
+    romaneio: r.romaneio as string,
+    n_pedidos: Number(r.n_pedidos ?? 0),
+    pedidos: ((r.pedidos as Record<string, unknown>[]) ?? []).map((p) => ({
+      cotacao_id: Number(p.cotacao_id),
+      pedido: (p.pedido as string) ?? null,
+      nf: (p.nf as string) ?? null,
+      cliente: (p.cliente as string) ?? null,
+      cidade: (p.cidade as string) ?? null,
+      contratada_transportadora_id:
+        p.contratada_transportadora_id == null ? null : Number(p.contratada_transportadora_id),
+      contratada_transportadora: (p.contratada_transportadora as string) ?? null,
+      contratada_valor: Number(p.contratada_valor ?? 0),
+      ofertas: ((p.ofertas as Record<string, unknown>[]) ?? []).map((o) => ({
+        transportadora_id: Number(o.transportadora_id),
+        transportadora: (o.transportadora as string) ?? null,
+        preco_final: Number(o.preco_final ?? 0),
+        prazo_dias: o.prazo_dias == null ? null : Number(o.prazo_dias),
+      })),
+    })),
+  }));
+
+  return { ref, diaMaisRecente, diasDisponiveis, kpis, linhas, cobertura, radar, tendencia, simulador };
 }
 
 // Cobertura do dia
