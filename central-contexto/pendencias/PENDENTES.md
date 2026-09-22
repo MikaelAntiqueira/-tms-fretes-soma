@@ -126,7 +126,24 @@ acima (exceto A5 e A6, ver por quê logo abaixo):
 Com isso, restam só A5 e A6 em aberto na `AUDITORIA_AG03.md`. O arquivo em si
 e a pasta `bot/` inteira continuam não commitados no git.
 
-## PLANEJADO, NÃO IMPLEMENTADO (2026-09-18) — Página `/usuarios` (Gestão de Usuários)
+## ✅ IMPLEMENTADO 2026-09-21/22 — Página `/usuarios` (Gestão de Usuários)
+
+Rascunho planejado em 2026-09-18 (seção abaixo mantida como referência histórica)
+foi implementado e commitado: commit `7d31126`, push pra `main` em 2026-09-22.
+Duas ações nesta entrega — **criar usuário** (e-mail + senha provisória definida
+pelo admin, via `POST /api/usuarios/criar`, usa a `SUPABASE_SERVICE_ROLE_KEY` em
+`src/lib/supabase-admin.ts`) e **trocar papel** (admin ⇄ usuário, RPC
+`admin_trocar_role`) — protegidas por `requireAdmin()`, mesmo padrão de
+`/importar`. RPCs `admin_listar_usuarios`/`admin_trocar_role` já aplicadas no
+Supabase de produção (migration `fn_admin_listar_usuarios_e_trocar_role`,
+20260922020222). `tsc --noEmit` e `npm run build` limpos antes do commit.
+**Resetar senha e remover acesso ficam para uma entrega futura** — decisão
+deliberada do Mikael pra manter o escopo enxuto nesta etapa; sem campo de
+nome/matrícula e sem status "Ativo/Inativo" pelo mesmo motivo (ver perguntas em
+aberto do rascunho original abaixo — seguem valendo se ele quiser essa extensão
+depois).
+
+### Rascunho original (2026-09-18), mantido como referência
 
 Mikael pediu pra deixar isso pré-organizado pra desenvolver depois (explicitamente:
 "não implante nada para não dar erro") — ele viu essa funcionalidade em outro
@@ -148,12 +165,14 @@ adaptado ao que este app realmente tem hoje.
   Supabase Auth — convite/recuperação de senha").
 - `role='admin'` só existe pro Mikael por decisão prévia ([DEC-29], D-12) — ver
   seção "Auth e segurança" mais abaixo neste arquivo.
-- **Nenhum código deste projeto usa a `service_role` key do Supabase hoje**
-  (confirmado por grep — só existe um comentário em `ImportarClient.tsx`
-  dizendo explicitamente que ela NÃO é usada). Isso importa porque toda ação
-  de admin sobre outro usuário (convidar, resetar senha, remover) exige
-  `supabase.auth.admin.*`, que só funciona com a `service_role` key — e essa
-  chave **nunca pode rodar no navegador** (bypassa toda RLS do banco).
+- **Nota histórica (válida até 2026-09-21)**: até a implementação abaixo,
+  nenhum código deste projeto usava a `service_role` key do Supabase — só
+  existia um comentário em `ImportarClient.tsx` dizendo explicitamente que ela
+  NÃO era usada. Isso mudou com a página `/usuarios` (ver seção "✅
+  IMPLEMENTADO" no topo deste arquivo): a ação de criar usuário exige
+  `supabase.auth.admin.createUser`, que só funciona com a `service_role`
+  key — isolada em `src/lib/supabase-admin.ts`, nunca importada por código
+  client-side (bypassa toda RLS do banco, não pode rodar no navegador).
 
 ### Proposta de página (rascunho, ainda não validado com o Mikael)
 Rota `/usuarios`, mesmo padrão de admin-only de `/importar` (`requireAdmin()`
