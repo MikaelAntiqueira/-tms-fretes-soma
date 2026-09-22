@@ -1,7 +1,45 @@
 # Pendências — TMS Fretes SOMA
 
-> Tarefas abertas e esperando ação. Última atualização: 2026-09-21.
+> Tarefas abertas e esperando ação. Última atualização: 2026-09-22.
 > Fonte: roadmap do README + análise das sessõs do outro PC.
+
+## ⚠️ NOVO ACHADO (2026-09-22, sessão do outro PC/Drive) — job_diario.bat não sincroniza o Supabase; base de contratações real também parada em 27/08
+
+Investigando um caso suspeito de diferença >700% que o Mikael viu na tela "Ontem" (produção), a
+sessão da pasta compartilhada (`H:\...\PROJETO FRETE COTADO X FRETE CONTRATADO`, projeto-fonte do
+pipeline Python) encontrou 2 achados relacionados — resumo para não duplicar investigação, detalhe
+completo em `memoria/07_PROBLEMAS_ABERTOS.md` ([ISSUE-24]/[ISSUE-25]) e `memoria/09_PROXIMAS_ACOES.md`
+([TASK-31]) daquele repositório (Google Drive, fora deste repo git):
+
+1. **Cruzamento cotação↔contratação sem checar endereço de entrega** — quando o mesmo CNPJ tem 2+
+   entregas em endereços diferentes no mesmo dia/romaneio, o parser podia casar o frete PAGO de uma
+   com a MENOR COTAÇÃO de outra, inflando a "Diferença R$". **Corrigido no pipeline Python**
+   (`codigo/parse_contratados.py`): quando 2+ candidatas com a mesma transportadora têm endereços
+   conhecidos e diferentes, o script não cruza mais (novo `motivo_sem_match` +
+   `stats["ambiguo_endereco_diferente"]`) em vez de chutar pelo horário mais próximo. Validado sem
+   regressão (`matched` segue 5.194); checagem exercitada 93× na base atual, 0 conflitos reais
+   encontrados nesta base específica.
+2. **`job_diario.bat` nunca chamou `load_to_supabase.py`** — não existe hoje nenhuma sincronização
+   diária Python → Supabase. `load_to_supabase.py` só rodou 1× (carga histórica de 11/09, mesma
+   citada abaixo na área "Área administrativa de importação").
+
+**Gravidade reavaliada no mesmo dia (22/09), antes de agir em produção**: conferido que a base LOCAL
+de contratações (`contratados_reais.json` — a mesma fonte que alimentaria uma recarga do Supabase)
+também tem `max(data) = 2026-08-27`, idêntico ao que já está no banco. Não existe hoje nenhum dado de
+contratação mais novo em lugar nenhum (falta `Contratados-202609.csv`; só existe até
+`Contratados-202608.csv`). O Mikael está fora da empresa e só volta a exportar dado novo dia 24/09.
+
+**Conclusão prática — não recarreguem o Supabase agora**: rodar `load_to_supabase.py` ou usar
+`/importar` hoje não traria nenhum dado novo, só reprocessaria o mesmo lote de 27/08 já carregado,
+com risco em produção sem ganho real. **Ação fica agendada para 24/09**: quando o Mikael exportar
+`Contratados-202609.csv`, rodar o pipeline (já sai com a correção de endereço embutida) e só então
+recarregar o Supabase (via `/importar` ou `load_to_supabase.py`) — aí a correção de endereço passa a
+valer de fato na tela "Ontem" em produção.
+
+**Pendência de processo, não urgente até 24/09**: decidir se `load_to_supabase.py` vira um passo
+incremental do `job_diario.bat` (hoje é `TRUNCATE` + reload completo das 3 tabelas de fato, não
+incremental) ou se o `/importar` manual (já pronto, ver seção "Área administrativa de importação"
+abaixo) basta enquanto a coleta automática nos PCs de cotação não for retomada.
 
 ## RESOLVIDO (2026-09-21) — 4 achados ALTO da `AUDITORIA_AG03.md` (A1-A4)
 
