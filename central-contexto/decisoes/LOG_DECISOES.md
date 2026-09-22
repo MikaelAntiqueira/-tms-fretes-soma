@@ -468,4 +468,31 @@ a milhares de reais). Como o scoring do Radar prioriza por magnitude em R$, D5 t
 entrar no top-5 de cards do dia mesmo quando há ocorrências reais. Não alterado nesta etapa —
 fica registrado caso o Mikael queira no futuro que D5 apareça independente de magnitude (ex.:
 reservar 1 slot fixo pra ele), já que "abaixo do piso" é mais uma questão de conformidade do que
+
+## D-34 — `/usuarios` quebrada logo após o deploy: `admin_listar_usuarios()` com erro 42702 (referência de coluna ambígua)
+
+**Bug**: a página `/usuarios` (implementada em 2026-09-21/22, ver PENDENTES.md) não carregava —
+`supabase.rpc("admin_listar_usuarios")` retornava erro do Postgres. Causa: a function
+`admin_listar_usuarios()` (migration `fn_admin_listar_usuarios_e_trocar_role`, 20260922020222)
+tem `RETURNS TABLE(id uuid, email text, role text, ...)`, e dentro do corpo o guard de acesso
+fazia `select 1 from public.profiles where profiles.id = auth.uid() and profiles.role = 'admin'`
+— mas em PL/pgSQL os nomes das colunas de saída (`id`, `role`) declarados em `RETURNS TABLE`
+também existem como variáveis implícitas dentro da function, colidindo com as colunas de mesmo
+nome de `profiles` referenciadas sem alias de tabela suficiente para o parser. Resultado: erro
+42702 "column reference \"id\"/\"role\" is ambiguous" toda vez que a function rodava.
+
+**Corrigido** (migration `fix_admin_listar_usuarios_ambiguous_id_role`, 20260922024948):
+reescrita a function qualificando explicitamente `profiles.id`/`profiles.role` no guard (já
+eram qualificados, mas o Postgres ainda os confundia com as colunas de saída do `RETURNS TABLE`
+de mesmo nome — a correção efetiva foi recriar a function do zero com o guard qualificado desde
+a primeira linha do corpo, eliminando a ambiguidade). Validado direto no Supabase
+(`pg_get_functiondef`): a function em produção hoje já reflete o fix. `COMMENT ON FUNCTION`
+atualizado registrando a causa (erro 42702) para não repetir o padrão em RPCs futuras que usem
+`RETURNS TABLE` com colunas de nome igual a colunas de tabelas reais referenciadas no corpo.
+
+**Lição pra próximas RPCs**: ao escrever `RETURNS TABLE(col1 ..., col2 ...)` em PL/pgSQL, evitar
+nomear colunas de saída igual a colunas de tabelas usadas dentro do corpo da function (ou, se
+inevitável, sempre qualificar com o nome completo da tabela/alias em TODA referência, sem
+exceção) — o Postgres não decide a ambiguidade a favor da tabela automaticamente mesmo com
+qualificação aparente.
 de tamanho financeiro.

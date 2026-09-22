@@ -143,6 +143,17 @@ nome/matrícula e sem status "Ativo/Inativo" pelo mesmo motivo (ver perguntas em
 aberto do rascunho original abaixo — seguem valendo se ele quiser essa extensão
 depois).
 
+**Bug pós-deploy encontrado e corrigido no mesmo dia (2026-09-22)**: a página
+não carregava — `admin_listar_usuarios()` batia em erro 42702 do Postgres
+(referência de coluna ambígua entre as colunas de saída do `RETURNS TABLE` e
+`profiles.id`/`profiles.role` referenciadas no guard de acesso). Corrigido na
+migration `fix_admin_listar_usuarios_ambiguous_id_role` (20260922024948) — ver
+[D-34] em `LOG_DECISOES.md` pra causa raiz completa e a lição pra RPCs
+futuras com `RETURNS TABLE`. **Confirmado pelo Mikael em produção (2026-09-22):
+`/usuarios` carrega certo.** Este item está fechado — nenhuma ação pendente
+além do que já está registrado acima como entrega futura (resetar senha/
+remover acesso).
+
 ### Rascunho original (2026-09-18), mantido como referência
 
 Mikael pediu pra deixar isso pré-organizado pra desenvolver depois (explicitamente:
