@@ -4,6 +4,7 @@ import { createSupabaseServerClient, requireUser } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/PageHeader";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
+import { PrintButton } from "./PrintButton";
 import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
 
 // Página "Resumo do Dia" (D-1) — decisões de contratação do dia mais
@@ -862,8 +863,21 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
 
             <section className="bloc">
               <div className="bloc-head">
-                <h2>Todas as contratações do dia</h2>
-                <div className="desc">ordenado pela diferença em R$ — cor classifica a faixa, não julga a decisão</div>
+                <div className="bloc-head-text">
+                  <h2>Todas as contratações do dia</h2>
+                  <div className="desc">ordenado pela diferença em R$ — cor classifica a faixa, não julga a decisão</div>
+                </div>
+                {/* [Pedido do Mikael, 2026-09-21] "Baixar CSV" (todas as
+                    notas do dia, sem filtro, via /ontem/csv) e "Baixar PDF"
+                    (window.print(), sem lib nova — Opção A). `no-print`
+                    esconde os dois botões quando a impressão de fato
+                    acontece. */}
+                <div className="export-actions no-print">
+                  <a href={`/ontem/csv?dia=${ref}`} className="export-link-btn">
+                    Baixar CSV (todas as notas, sem filtro)
+                  </a>
+                  <PrintButton />
+                </div>
               </div>
               <div className="table-scroll">
                 <table className="data">
