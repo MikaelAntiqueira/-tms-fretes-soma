@@ -200,30 +200,26 @@ async function fetchComparacoes(filtros: FiltrosOportunidades): Promise<{
   // `.range()`: o servidor recorta a resposta de qualquer jeito). Sem isso,
   // a página buscava só as primeiras 1.000 e reportava como se fosse a
   // cobertura REAL da base ("1.000 processos, 14,5% da base") — quando o
-  // real é 5.194 (75,1%). Fix: pagina em lotes de 1000 — 1ª página já traz
-  // o total exato (`count: "exact"`), as demais páginas disparam em
-  // paralelo (Promise.all), não em série, pra não somar latência à toa.
-  // Achado ao trabalhar no motor de filtro desta página, não relacionado.
-  const PAGE = 1000;
-  const orderOpts = { ascending: false, nullsFirst: false } as const;
-
-  const [{ data: firstPage, count: totalComparacoes, error: firstError }, { count: totalCotacoes }] = await Promise.all([
-    supabase.from("comparacoes").select("*", { count: "exact" }).order("diffR", orderOpts).range(0, PAGE - 1),
+  // real é 5.194 (75,1%). Achado ao trabalhar no motor de filtro desta
+  // página, não relacionado.
+  //
+  // [FIX 2026-09-24] A solução anterior (paginar em lotes de 1000 via
+  // Promise.all) crescia mal: com a base em 11.488 linhas isso virou 12
+  // requisições CONCORRENTES, cada uma recomputando a view `comparacoes`
+  // inteira e ordenando as 11k linhas só pra descartar tudo exceto 1000 —
+  // essa duplicação de trabalho estourava o statement_timeout sob
+  // contenção real (reproduzido no navegador logado). Trocado por uma RPC
+  // (`oportunidades_comparacoes_todas`, migration
+  // oportunidades_comparacoes_uma_query_em_vez_de_12) que devolve TODAS as
+  // linhas num jsonb só — não sujeito ao limite de "Max Rows" do PostgREST
+  // (que se aplica a arrays de linhas de uma resposta REST, não a um único
+  // valor jsonb) — computa a view e ordena uma vez só, numa requisição.
+  const [{ data: comparacoesJson, error: firstError }, { count: totalCotacoes }] = await Promise.all([
+    supabase.rpc("oportunidades_comparacoes_todas"),
     supabase.from("cotacoes").select("*", { count: "exact", head: true }),
   ]);
   if (firstError) throw new Error(firstError.message);
-
-  const restPageCount = Math.max(0, Math.ceil((totalComparacoes ?? 0) / PAGE) - 1);
-  const restPages = await Promise.all(
-    Array.from({ length: restPageCount }, (_, i) => {
-      const offset = (i + 1) * PAGE;
-      return supabase.from("comparacoes").select("*").order("diffR", orderOpts).range(offset, offset + PAGE - 1);
-    })
-  );
-  for (const p of restPages) {
-    if (p.error) throw new Error(p.error.message);
-  }
-  const allRows: Record<string, unknown>[] = [...(firstPage ?? []), ...restPages.flatMap((p) => p.data ?? [])];
+  const allRows: Record<string, unknown>[] = (comparacoesJson as Record<string, unknown>[] | null) ?? [];
 
   // Aplicar filtros na linha (PostgREST não suporta filter string raw via SDK,
   // então filtramos manualmente no cliente com as mesmas condições). Cada
