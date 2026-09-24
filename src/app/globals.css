@@ -550,6 +550,28 @@ section.bloc { margin-top: 34px; }
 .alert-card.warn .dot { background: var(--warning); }
 .alert-card.warn h4 { color: var(--warning); }
 
+/* ---- Radar de Decisão compacto (2026-09-23) — desceu pro fim da página
+   (pedido do Mikael: a informação principal de /ontem é a tabela de
+   contratações, não o Radar) e virou 1 linha por situação (<details>,
+   mesmo padrão de PedidoRow em RomaneioSimulador.tsx) em vez do grid de
+   `.alert-card` grandes. Mesmas cores/regra tipo->classe de antes. */
+.radar-row-list { display: flex; flex-direction: column; gap: 8px; }
+.radar-row { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface-card); }
+.radar-row summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; font-size: 12.5px;
+}
+.radar-row summary::-webkit-details-marker { display: none; }
+.radar-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.radar-row .rtitle { font: 700 11px var(--font-manrope), sans-serif; color: var(--text-primary); flex-shrink: 0; white-space: nowrap; }
+.radar-row .rresumo {
+  color: var(--text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.radar-row .pill { flex-shrink: 0; }
+.radar-row.info .dot { background: var(--brand-700); }
+.radar-row.crit .dot { background: var(--critical); }
+.radar-row.warn .dot { background: var(--warning); }
+.radar-row .rdetail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 11.5px; color: var(--text-secondary); }
+
 /* ---- Variante para notas longas (pendências/fora do escopo/aguardando
    dado) — o `.num` acima foi desenhado para valores curtos (ex.: "R$
    1.234,56") e corta com nowrap quando o conteúdo é uma frase inteira.
@@ -584,9 +606,26 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 /* ---- Estado vazio do Radar de Decisão ("dentro do padrão neste dia") ---- */
 .sim-empty { text-align: center; padding: 30px 18px; color: var(--text-muted); font-size: 12.5px; line-height: 1.6; }
 .sim-empty b { color: var(--text-primary); }
-.sim-pedido { border-bottom: 1px solid var(--border); padding: 8px 0; }
-.sim-pedido:last-child { border-bottom: none; }
-.sim-pedido summary:hover { color: var(--brand-700); }
+
+/* ---- Cards de pedido do Simulador de Frete (2026-09-23) — antes eram
+   <details> recolhidos (.sim-pedido, removida); viraram cards sempre
+   abertos, estilo Visão Geral (borda colorida à esquerda), com a tabela
+   completa de ofertas sempre visível. Pedido do Mikael: a comparação de
+   preço é a informação principal da tela, não deveria exigir clique. */
+.sim-ped-list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.sim-ped-card {
+  border: 1px solid var(--border); border-left: 4px solid var(--brand-700); border-radius: var(--radius-card);
+  background: var(--surface-card); padding: 14px 16px;
+}
+.sim-ped-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.sim-ped-nf { font: 700 10.5px var(--font-manrope), sans-serif; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+.sim-ped-cliente { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.sim-ped-valor-row { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; }
+.sim-ped-valor { font-size: 18px; font-weight: 700; }
+.sim-ped-diff { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.sim-ped-diff.bad { color: var(--critical); background: var(--critical-bg); }
+.sim-ped-diff.ok { color: var(--good); background: var(--good-bg); }
+tr.sim-ped-contratada { background: var(--info-bg); }
 
 @media (max-width: 640px) {
   section.bloc { margin-top: 24px; }

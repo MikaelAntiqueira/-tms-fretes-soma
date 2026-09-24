@@ -736,59 +736,36 @@ function radarPill(cls: "crit" | "warn" | "info"): "n" | "laranja" | "azul" {
   return cls === "crit" ? "n" : cls === "warn" ? "laranja" : "azul";
 }
 
-function RadarCardView({ c }: { c: RadarCardData }) {
+// RadarRowView — versão compacta (2026-09-23, pedido do Mikael): o Radar
+// desceu pro fim da página e virou 1 linha por situação (clique/<details>
+// pra expandir), em vez do grid de cards grandes de antes. Mesmo padrão de
+// <details> já usado em PedidoRow (RomaneioSimulador.tsx) — sem estado novo.
+function RadarRowView({ c }: { c: RadarCardData }) {
   const cls = radarCls(c.tipo);
   const pill = radarPill(cls);
   return (
-    <div className={`alert-card ${cls}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <h4 style={{ justifyContent: "space-between", width: "100%" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-          <span className="dot" />
-          {c.tipo}
+    <details className={`radar-row ${cls}`}>
+      <summary>
+        <span className="dot" />
+        <span className="rtitle">{c.tipo}</span>
+        <span className="rresumo">
+          {c.titulo} — {c.magTxt}
         </span>
         <span className={`pill ${pill}`}>{c.acao}</span>
-      </h4>
-      <div style={{ fontFamily: "var(--font-manrope)", fontWeight: 800, fontSize: 13, color: "var(--text-primary)" }}>
-        {c.titulo}
-      </div>
-      <div className="mono" style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
-        {c.magTxt}
-      </div>
-      <ul
-        style={{
-          margin: 0,
-          padding: 0,
-          listStyle: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: 3,
-          fontSize: 11.5,
-          color: "var(--text-secondary)",
-        }}
-      >
-        {c.evid.map((e, i) => (
-          <li key={i}>• {e}</li>
-        ))}
-      </ul>
-      <div
-        style={{
-          fontSize: 10.5,
-          color: "var(--text-muted)",
-          borderTop: "1px dashed var(--border)",
-          paddingTop: 6,
-          lineHeight: 1.5,
-        }}
-      >
-        Regra: {c.regra}
-        <br />
-        Confiabilidade: <b>{c.conf}</b> — {c.confMot}
-      </div>
-      {c.drill.length > 0 && (
-        <details style={{ fontSize: 11 }}>
-          <summary style={{ cursor: "pointer", color: "var(--brand-700)", fontWeight: 600 }}>
-            ver {c.drill.length} operação(ões)
-          </summary>
-          <div className="table-scroll" style={{ marginTop: 6 }}>
+      </summary>
+      <div className="rdetail">
+        <ul style={{ margin: "0 0 8px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
+          {c.evid.map((e, i) => (
+            <li key={i}>• {e}</li>
+          ))}
+        </ul>
+        <div style={{ lineHeight: 1.5 }}>
+          Regra: {c.regra}
+          <br />
+          Confiabilidade: <b>{c.conf}</b> — {c.confMot}
+        </div>
+        {c.drill.length > 0 && (
+          <div className="table-scroll" style={{ marginTop: 8 }}>
             <table className="data compact">
               <thead>
                 <tr>
@@ -814,9 +791,9 @@ function RadarCardView({ c }: { c: RadarCardData }) {
               </tbody>
             </table>
           </div>
-        </details>
-      )}
-    </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -915,26 +892,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
 
             <RomaneioSimulador data={simuladorData} />
 
-            <section className="bloc">
-              <div className="bloc-head">
-                <h2>Radar de Decisão</h2>
-              </div>
-              <CoberturaNote c={cobertura} />
-              {radarCardsList.length === 0 ? (
-                <div className="sim-empty">
-                  <b>Operação dentro do padrão neste dia.</b>
-                  <br />
-                  nenhuma situação passou dos limiares do Radar.
-                </div>
-              ) : (
-                <div className="grid cols-auto">
-                  {radarCardsList.map((c, i) => (
-                    <RadarCardView c={c} key={i} />
-                  ))}
-                </div>
-              )}
-            </section>
-
             {/* Card "Aguardando dado / regra" (D1/D5) removido em 2026-09-17:
                 os dois detectores que ele bloqueava foram ligados nesta
                 etapa ([D-32]/[D-33]) — ver comentário no topo do arquivo. */}
@@ -1022,6 +979,26 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                 cobertura de cruzamento cotação↔contratação é ~1/3 da operação — limitação da fonte,
                 não desta tela).
               </div>
+            </section>
+
+            <section className="bloc radar-section">
+              <div className="bloc-head">
+                <h2>Radar de Decisão</h2>
+              </div>
+              <CoberturaNote c={cobertura} />
+              {radarCardsList.length === 0 ? (
+                <div className="sim-empty">
+                  <b>Operação dentro do padrão neste dia.</b>
+                  <br />
+                  nenhuma situação passou dos limiares do Radar.
+                </div>
+              ) : (
+                <div className="radar-row-list">
+                  {radarCardsList.map((c, i) => (
+                    <RadarRowView c={c} key={i} />
+                  ))}
+                </div>
+              )}
             </section>
           </>
         )}

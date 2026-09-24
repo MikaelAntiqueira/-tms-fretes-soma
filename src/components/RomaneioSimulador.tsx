@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmtBRL, fmtNum } from "@/lib/format";
+import { fmtBRL, fmtNum, fmtPct } from "@/lib/format";
 
 // Simulador de Frete por Romaneio — ver
 // docs/superpowers/specs/2026-09-22-simulador-frete-romaneio-design.md.
@@ -37,7 +37,7 @@ export interface RomaneioSimuladorRow {
 
 function OfertaTableRow({ o, contratada, maisBarata }: { o: OfertaSimulada; contratada: boolean; maisBarata: boolean }) {
   return (
-    <tr>
+    <tr className={contratada ? "sim-ped-contratada" : undefined}>
       <td>{o.transportadora ?? "—"}</td>
       <td className="num">{fmtBRL(o.preco_final)}</td>
       <td className="num">{o.prazo_dias != null ? `${fmtNum(o.prazo_dias)}d` : "—"}</td>
@@ -49,21 +49,42 @@ function OfertaTableRow({ o, contratada, maisBarata }: { o: OfertaSimulada; cont
   );
 }
 
+// Card por pedido (2026-09-23, pedido do Mikael): antes era um <details>
+// recolhido com uma tabela compacta dentro; virou um card sempre aberto,
+// estilo Visão Geral (borda colorida à esquerda), com a tabela COMPLETA de
+// ofertas sempre visível — a comparação de preço é a informação principal
+// da tela, não deveria exigir clique nenhum pra aparecer.
 function PedidoRow({ p }: { p: PedidoSimulado }) {
+  const maisBarataPreco = p.ofertas[0]?.preco_final ?? null;
+  const diff = maisBarataPreco != null ? p.contratada_valor - maisBarataPreco : null;
+  const diffFrac = diff != null && maisBarataPreco ? diff / maisBarataPreco : null;
+
   return (
-    <details className="sim-pedido">
-      <summary style={{ cursor: "pointer" }}>
-        <span style={{ fontWeight: 700 }}>{p.pedido ?? "—"}</span>
-        {" · "}NF {p.nf ?? "—"} · {p.cliente ?? "—"} · {p.cidade ?? "—"}
-        {" · "}
-        <span className="mono">{fmtBRL(p.contratada_valor)}</span> ({p.contratada_transportadora ?? "—"})
-      </summary>
-      <div className="table-scroll" style={{ marginTop: 6 }}>
-        {p.ofertas.length === 0 ? (
-          <div className="sim-empty" style={{ padding: 8 }}>
-            Sem cotações concorrentes registradas para este pedido.
+    <div className="sim-ped-card">
+      <div className="sim-ped-head">
+        <div>
+          <div className="sim-ped-nf">NF {p.nf ?? "—"} · Pedido {p.pedido ?? "—"}</div>
+          <div className="sim-ped-cliente">
+            {p.cliente ?? "—"} · {p.cidade ?? "—"}
           </div>
-        ) : (
+        </div>
+        <div className="sim-ped-valor-row">
+          <span className="sim-ped-valor mono">{fmtBRL(p.contratada_valor)}</span>
+          {diff != null && (
+            <span className={`sim-ped-diff ${diff > 0 ? "bad" : "ok"}`}>
+              {diff === 0
+                ? "mais barata"
+                : `${diff > 0 ? "+" : ""}${fmtBRL(diff)}${diffFrac != null ? ` (${fmtPct(diffFrac)})` : ""}`}
+            </span>
+          )}
+        </div>
+      </div>
+      {p.ofertas.length === 0 ? (
+        <div className="sim-empty" style={{ padding: 8 }}>
+          Sem cotações concorrentes registradas para este pedido.
+        </div>
+      ) : (
+        <div className="table-scroll">
           <table className="data compact">
             <thead>
               <tr>
@@ -84,9 +105,9 @@ function PedidoRow({ p }: { p: PedidoSimulado }) {
               ))}
             </tbody>
           </table>
-        )}
-      </div>
-    </details>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -125,7 +146,7 @@ export function RomaneioSimulador({ data }: { data: RomaneioSimuladorRow[] }) {
           ))}
         </select>
       </div>
-      <div style={{ marginTop: 8 }}>
+      <div className="sim-ped-list">
         {atual.pedidos.map((p) => (
           <PedidoRow p={p} key={p.cotacao_id} />
         ))}
