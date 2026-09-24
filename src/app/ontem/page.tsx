@@ -894,8 +894,6 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               </div>
             </section>
 
-            <RomaneioSimulador data={simuladorData} />
-
             {/* Card "Aguardando dado / regra" (D1/D5) removido em 2026-09-17:
                 os dois detectores que ele bloqueava foram ligados nesta
                 etapa ([D-32]/[D-33]) — ver comentário no topo do arquivo. */}
@@ -984,6 +982,8 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
                 não desta tela).
               </div>
             </section>
+
+            <RomaneioSimulador data={simuladorData} />
 
             <section className="bloc radar-section">
               <div className="bloc-head">
