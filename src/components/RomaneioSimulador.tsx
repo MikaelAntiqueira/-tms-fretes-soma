@@ -11,19 +11,19 @@ import { fmtBRL, fmtNum, fmtPct } from "@/lib/format";
 // nenhuma chamada de rede nova.
 
 export interface OfertaSimulada {
-  transportadora_id: number;
+  transportadora_id: string;
   transportadora: string | null;
   preco_final: number;
   prazo_dias: number | null;
 }
 
 export interface PedidoSimulado {
-  cotacao_id: number;
+  cotacao_id: string;
   pedido: string | null;
   nf: string | null;
   cliente: string | null;
   cidade: string | null;
-  contratada_transportadora_id: number | null;
+  contratada_transportadora_id: string | null;
   contratada_transportadora: string | null;
   contratada_valor: number;
   ofertas: OfertaSimulada[];
@@ -69,7 +69,10 @@ function PedidoRow({ p }: { p: PedidoSimulado }) {
           </div>
         </div>
         <div className="sim-ped-valor-row">
-          <span className="sim-ped-valor mono">{fmtBRL(p.contratada_valor)}</span>
+          <div style={{ textAlign: "right" }}>
+            <span className="sim-ped-valor mono">{fmtBRL(p.contratada_valor)}</span>
+            <div className="sim-ped-transp">{p.contratada_transportadora ?? "transportadora não identificada"}</div>
+          </div>
           {diff != null && (
             <span className={`sim-ped-diff ${diff > 0 ? "bad" : "ok"}`}>
               {diff === 0

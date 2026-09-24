@@ -622,6 +622,7 @@ td.num { font-family: var(--font-ibm-plex-mono), monospace; text-align: right; }
 .sim-ped-cliente { font-size: 13.5px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
 .sim-ped-valor-row { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; }
 .sim-ped-valor { font-size: 18px; font-weight: 700; }
+.sim-ped-transp { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
 .sim-ped-diff { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
 .sim-ped-diff.bad { color: var(--critical); background: var(--critical-bg); }
 .sim-ped-diff.ok { color: var(--good); background: var(--good-bg); }

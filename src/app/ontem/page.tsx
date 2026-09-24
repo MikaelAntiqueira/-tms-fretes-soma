@@ -684,17 +684,21 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
     romaneio: r.romaneio as string,
     n_pedidos: Number(r.n_pedidos ?? 0),
     pedidos: ((r.pedidos as Record<string, unknown>[]) ?? []).map((p) => ({
-      cotacao_id: Number(p.cotacao_id),
+      // cotacao_id/transportadora_id são uuid no banco — Number(uuid) vira
+      // NaN e NaN === NaN é sempre false em JS, o que quebrava silenciosamente
+      // a comparação "é a transportadora contratada?" (achado 2026-09-23,
+      // Mikael notou que o selo "Contratada" nunca aparecia nos cards).
+      cotacao_id: String(p.cotacao_id),
       pedido: (p.pedido as string) ?? null,
       nf: (p.nf as string) ?? null,
       cliente: (p.cliente as string) ?? null,
       cidade: (p.cidade as string) ?? null,
       contratada_transportadora_id:
-        p.contratada_transportadora_id == null ? null : Number(p.contratada_transportadora_id),
+        p.contratada_transportadora_id == null ? null : String(p.contratada_transportadora_id),
       contratada_transportadora: (p.contratada_transportadora as string) ?? null,
       contratada_valor: Number(p.contratada_valor ?? 0),
       ofertas: ((p.ofertas as Record<string, unknown>[]) ?? []).map((o) => ({
-        transportadora_id: Number(o.transportadora_id),
+        transportadora_id: String(o.transportadora_id),
         transportadora: (o.transportadora as string) ?? null,
         preco_final: Number(o.preco_final ?? 0),
         prazo_dias: o.prazo_dias == null ? null : Number(o.prazo_dias),
