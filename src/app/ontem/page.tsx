@@ -6,8 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { OntemTendenciaChart, type OntemTendenciaRow } from "@/components/OntemTendenciaChart";
 import { DiaSelector } from "@/components/DiaSelector";
 import { RomaneioSimulador, type RomaneioSimuladorRow } from "@/components/RomaneioSimulador";
-import { PrintButton } from "./PrintButton";
-import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti, clsDif, EscPill } from "@/lib/format";
+import { ContratacoesTable } from "./ContratacoesTable";
+import { fmtBRL, fmtBRL2, fmtNum, fmtPct, fmtDate, fmtMes, parseMulti } from "@/lib/format";
 
 // Página "Resumo do Dia" (D-1) — decisões de contratação do dia mais
 // recente com contratação cruzada a uma cotação. Porta, linha a linha, a
@@ -62,7 +62,7 @@ interface OntemKpis {
   n_comparaveis: number;
 }
 
-interface OntemLinha {
+export interface OntemLinha {
   romaneio: string | null;
   cliente: string | null;
   cidade: string | null;
@@ -75,6 +75,7 @@ interface OntemLinha {
   janela: string | null;
   nf: string | null;
   endereco_entrega: string | null;
+  tipo_cliente: string | null;
 }
 
 interface OntemCobertura {
@@ -660,6 +661,7 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
     janela: (r.janela as string) ?? null,
     nf: (r.nf as string) ?? null,
     endereco_entrega: (r.endereco_entrega as string) ?? null,
+    tipo_cliente: (r.tipo_cliente as string) ?? null,
   }));
 
   const cobertura: OntemCobertura | null = coberturaRow
@@ -901,87 +903,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               <OntemTendenciaChart rows={tendencia} diaRef={ref} />
             </section>
 
-            <section className="bloc">
-              <div className="bloc-head">
-                <div className="bloc-head-text">
-                  <h2>Todas as contratações do dia</h2>
-                </div>
-                {/* [Pedido do Mikael, 2026-09-21] "Baixar CSV" (todas as
-                    notas do dia, sem filtro, via /ontem/csv) e "Baixar PDF"
-                    (window.print(), sem lib nova — Opção A). `no-print`
-                    esconde os dois botões quando a impressão de fato
-                    acontece. */}
-                <div className="export-actions no-print">
-                  <a href={`/ontem/csv?dia=${ref}`} className="export-link-btn">
-                    Baixar CSV (todas as notas, sem filtro)
-                  </a>
-                  <PrintButton />
-                </div>
-              </div>
-              <div className="table-scroll">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Romaneio</th>
-                      <th>Cliente</th>
-                      <th>Cidade</th>
-                      <th>Transportadora</th>
-                      <th className="num">Frete pago</th>
-                      <th className="num">Menor cotação</th>
-                      <th className="num">Diferença R$</th>
-                      <th className="num">Diferença %</th>
-                      <th>Escolheu a + barata?</th>
-                      <th>Janela</th>
-                      <th>Endereço de entrega</th>
-                      <th>NF</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linhas.length === 0 ? (
-                      <tr>
-                        <td colSpan={12} style={{ color: "var(--text-muted)" }}>
-                          Sem contratações neste dia.
-                        </td>
-                      </tr>
-                    ) : (
-                      linhas.map((r, i) => {
-                        const cls = clsDif(r.diferenca_r, r.diferenca_pct);
-                        const style = cls ? { color: `var(--${cls})`, fontWeight: 700 } : undefined;
-                        return (
-                          <tr key={i}>
-                            <td>{r.romaneio ?? "—"}</td>
-                            <td>{r.cliente ?? "—"}</td>
-                            <td>{r.cidade ?? "—"}</td>
-                            <td>{r.transportadora ?? "—"}</td>
-                            <td className="num">{fmtBRL(r.frete_contratado)}</td>
-                            <td className="num">{fmtBRL(r.melhor_cotacao)}</td>
-                            <td className="num" style={style}>
-                              {r.diferenca_r == null ? "—" : fmtBRL(r.diferenca_r)}
-                            </td>
-                            <td className="num" style={style}>
-                              {r.diferenca_pct == null ? "—" : fmtPct(r.diferenca_pct)}
-                            </td>
-                            <td>
-                              <EscPill e={r.escolheu} />
-                            </td>
-                            <td>{r.janela ?? "—"}</td>
-                            <td>{r.endereco_entrega ?? "—"}</td>
-                            <td>{r.nf ?? "—"}</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
-                &quot;Tempo real&quot; = fechamento do dia (D-1). O dia mostrado é o{" "}
-                <b>último com contratações cruzadas</b> nos dados — enquanto o robô diário do
-                relatório &quot;Contratados&quot; não estiver ligado, pode ficar alguns dias atrás (a
-                cobertura de cruzamento cotação↔contratação é ~1/3 da operação — limitação da fonte,
-                não desta tela).
-              </div>
-            </section>
+            <ContratacoesTable linhas={linhas} ref={ref} />
 
             <RomaneioSimulador data={simuladorData} />
 
