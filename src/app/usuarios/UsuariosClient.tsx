@@ -3,11 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-// Client component: as duas ações interativas da página /usuarios —
+// Client component: as três ações interativas da página /usuarios —
 // criar usuário (POST /api/usuarios/criar, precisa da service_role key,
-// por isso passa por um Route Handler) e trocar papel admin/usuário (RPC
+// por isso passa por um Route Handler), trocar papel admin/usuário (RPC
 // admin_trocar_role, migration fn_admin_listar_usuarios_e_trocar_role,
-// só usa a sessão normal do admin). Resetar senha e remover acesso ficam
+// só usa a sessão normal do admin) e remover acesso (POST
+// /api/usuarios/excluir, também via service_role — auth.admin.deleteUser,
+// o ON DELETE CASCADE de profiles.id cuida do resto). Resetar senha fica
 // para uma entrega futura.
 export interface UsuarioRow {
   id: string;
@@ -101,6 +103,30 @@ export function UsuariosClient({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, role: novoRole } : r)));
   }
 
+  // --- Remover acesso ---
+  const [removendoId, setRemovendoId] = useState<string | null>(null);
+  const [erroRemover, setErroRemover] = useState<string | null>(null);
+
+  async function removerAcesso(id: string, email: string) {
+    if (!window.confirm(`Remover o acesso de ${email}? Essa ação não pode ser desfeita.`)) return;
+    setErroRemover(null);
+    setRemovendoId(id);
+    try {
+      const res = await fetch("/api/usuarios/excluir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erro ao remover acesso.");
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setErroRemover(err instanceof Error ? err.message : "Erro desconhecido ao remover acesso.");
+    } finally {
+      setRemovendoId(null);
+    }
+  }
+
   return (
     <>
       <form onSubmit={criarUsuario} className="bloc" style={{ marginTop: 0, marginBottom: 20 }}>
@@ -162,6 +188,11 @@ export function UsuariosClient({
             {erroRole}
           </div>
         )}
+        {erroRemover && (
+          <div className="status-banner erro" style={{ marginBottom: 14 }}>
+            {erroRemover}
+          </div>
+        )}
         <table className="data">
           <thead>
             <tr>
@@ -186,7 +217,7 @@ export function UsuariosClient({
                   </td>
                   <td>{fmtData(r.criado_em)}</td>
                   <td>{fmtData(r.ultimo_acesso)}</td>
-                  <td>
+                  <td style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
                       className="tab-btn"
@@ -195,6 +226,15 @@ export function UsuariosClient({
                       onClick={() => trocarRole(r.id, novoRole)}
                     >
                       {loadingId === r.id ? "Salvando…" : novoRole === "admin" ? "Tornar admin" : "Tornar usuário"}
+                    </button>
+                    <button
+                      type="button"
+                      className="tab-btn"
+                      disabled={isSelf || removendoId === r.id}
+                      title={isSelf ? "Você não pode remover o seu próprio acesso." : undefined}
+                      onClick={() => removerAcesso(r.id, r.email)}
+                    >
+                      {removendoId === r.id ? "Removendo…" : "Remover acesso"}
                     </button>
                   </td>
                 </tr>

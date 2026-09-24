@@ -175,11 +175,22 @@ pelo admin, via `POST /api/usuarios/criar`, usa a `SUPABASE_SERVICE_ROLE_KEY` em
 `/importar`. RPCs `admin_listar_usuarios`/`admin_trocar_role` já aplicadas no
 Supabase de produção (migration `fn_admin_listar_usuarios_e_trocar_role`,
 20260922020222). `tsc --noEmit` e `npm run build` limpos antes do commit.
-**Resetar senha e remover acesso ficam para uma entrega futura** — decisão
-deliberada do Mikael pra manter o escopo enxuto nesta etapa; sem campo de
-nome/matrícula e sem status "Ativo/Inativo" pelo mesmo motivo (ver perguntas em
-aberto do rascunho original abaixo — seguem valendo se ele quiser essa extensão
-depois).
+**Resetar senha fica para uma entrega futura** — decisão deliberada do Mikael
+pra manter o escopo enxuto nesta etapa; sem campo de nome/matrícula e sem
+status "Ativo/Inativo" pelo mesmo motivo (ver perguntas em aberto do rascunho
+original abaixo — seguem valendo se ele quiser essa extensão depois).
+
+**✅ "Remover acesso" IMPLEMENTADO 2026-09-23** (Mikael pediu ao ver a tela
+`/usuarios` sem essa opção): `POST /api/usuarios/excluir` (mesmo padrão de
+`/api/usuarios/criar`, `service_role` via `src/lib/supabase-admin.ts`) chama
+`auth.admin.deleteUser(id)` — o `ON DELETE CASCADE` de `profiles.id →
+auth.users.id` já cuidava da limpeza, sem precisar de lógica extra. Botão
+"Remover acesso" em `UsuariosClient.tsx`, com `window.confirm()` antes de
+disparar e desabilitado pro próprio usuário logado (mesma proteção `isSelf`
+já usada em "trocar papel"). `tsc --noEmit` e `npm run build` limpos. Ainda
+**não commitado/testado em produção** nesta sessão (feito direto na working
+tree local) — falta o Mikael revisar, testar em `/usuarios` e decidir se
+commita/dá push.
 
 **Bug pós-deploy encontrado e corrigido no mesmo dia (2026-09-22)**: a página
 não carregava — `admin_listar_usuarios()` batia em erro 42702 do Postgres
@@ -189,8 +200,7 @@ migration `fix_admin_listar_usuarios_ambiguous_id_role` (20260922024948) — ver
 [D-34] em `LOG_DECISOES.md` pra causa raiz completa e a lição pra RPCs
 futuras com `RETURNS TABLE`. **Confirmado pelo Mikael em produção (2026-09-22):
 `/usuarios` carrega certo.** Este item está fechado — nenhuma ação pendente
-além do que já está registrado acima como entrega futura (resetar senha/
-remover acesso).
+além do que já está registrado acima como entrega futura (resetar senha).
 
 ### Rascunho original (2026-09-18), mantido como referência
 
