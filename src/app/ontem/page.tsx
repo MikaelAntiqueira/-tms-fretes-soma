@@ -903,7 +903,7 @@ export default async function OntemPage({ searchParams }: { searchParams: Promis
               <OntemTendenciaChart rows={tendencia} diaRef={ref} />
             </section>
 
-            <ContratacoesTable linhas={linhas} ref={ref} />
+            <ContratacoesTable linhas={linhas} dia={ref} />
 
             <RomaneioSimulador data={simuladorData} />
 
