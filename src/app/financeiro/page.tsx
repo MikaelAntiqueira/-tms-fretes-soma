@@ -37,13 +37,27 @@ import { PesoCustoCharts } from "./PesoCustoCharts";
 // `transportadoras_comparativo()` (Bloco 3, maior participação/maior %
 // mais barata) já existentes — não recalcula nada que essas duas já fazem.
 //
+// [FIX 2026-09-24] financeiro_visao_geral_kpis + financeiro_visao_geral_
+// resumo + financeiro_diff_n_esc_nao eram 3 RPCs separadas, todas escaneando
+// a MESMA base filtrada (v_financeiro_base). A página disparava 9 RPCs ao
+// mesmo tempo (Promise.all) contra uma instância pequena do Supabase (2
+// vCPUs, max_parallel_workers=2) — mesmo cada uma rápida sozinha, a
+// concorrência entre elas estourava o statement_timeout de 8s do role
+// authenticated e derrubava a página inteira. Fundidas numa única RPC
+// (mesmo nome financeiro_visao_geral_kpis, migration
+// consolida_financeiro_kpis_resumo_diffn_reduz_concorrencia) — reduz de 9
+// para 7 conexões concorrentes. `financeiro_visao_geral_resumo` e
+// `financeiro_diff_n_esc_nao` como functions separadas foram DROPADAS
+// (só esta página as chamava).
+//
 // Sub-aba "Cotado × Contratado": agregação mensal via RPC `financeiro_
 // evolucao_mensal()` (migration `fn_financeiro_evolucao_mensal_e_
 // diff_n_esc_nao`) — 1 linha por mês (frete/melhor/nMelhor/diffPosSum),
 // construída em cima de `v_financeiro_base` como CTE. O doughnut "Escolheu
 // a Mais Barata?" reaproveita os contadores esc_s/esc_n/esc_sc de
-// `financeiro_visao_geral_kpis()` — só a soma de `diferenca_r` das linhas
-// `esc='N'` precisava de peça nova, via RPC `financeiro_diff_n_esc_nao()`.
+// `financeiro_visao_geral_kpis()` — a soma de `diferenca_r` das linhas
+// `esc='N'` (`diff_n_esc_nao_sum`) agora vem do mesmo resultado (ver FIX
+// 2026-09-24 acima).
 //
 // Sub-abas "Padrões da Diferença" e "Peso, Cubagem & Custo" (novas, 2026-09-
 // 13): 8 RPCs novas (migration `fn_financeiro_padroes_e_peso_cubagem`),
@@ -362,18 +376,23 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
 
   const [
     kpisRes,
-    resumoRes,
     janelasRes,
     transpRes,
     opcoesRes,
     evolucaoRes,
-    diffNRes,
     padroesPesoRes,
     simulacaoRes,
   ] = await Promise.all([
-    // ---- as 4 RPCs que a sub-aba "Visão Geral" usa: reagem ao filtro ----
+    // ---- [FIX 2026-09-24] financeiro_visao_geral_kpis + _resumo +
+    // financeiro_diff_n_esc_nao eram 3 RPCs separadas, todas escaneando a
+    // MESMA base filtrada (v_financeiro_base) -- a pagina disparava 9 RPCs
+    // ao mesmo tempo (Promise.all) contra uma instancia pequena do Supabase
+    // (2 vCPUs), e a concorrencia entre elas estourava o statement_timeout
+    // de 8s mesmo cada uma sendo rapida sozinha. Fundidas numa unica RPC
+    // (mesmo nome financeiro_visao_geral_kpis, migration
+    // consolida_financeiro_kpis_resumo_diffn_reduz_concorrencia) -- reduz
+    // de 9 para 7 conexoes concorrentes.
     supabase.rpc("financeiro_visao_geral_kpis", filtroArgs),
-    supabase.rpc("financeiro_visao_geral_resumo", filtroArgs),
     supabase.rpc("operacao_por_janela", filtroArgs),
     supabase.rpc("transportadoras_comparativo", filtroArgs),
     // ---- opções completas (sem cascata) para os dropdowns Região/Tipo ----
@@ -387,7 +406,6 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     // 2026-09-17 (migration fn_financeiro_add_filtro_global_padroes_
     // pesocustagem_cotadocontratado), mesmo padrão das 4 RPCs acima ----
     supabase.rpc("financeiro_evolucao_mensal", filtroArgs),
-    supabase.rpc("financeiro_diff_n_esc_nao", filtroArgs),
     // ---- [FIX 2026-09-18] "Padrões da Diferença" + "Peso, Cubagem & Custo"
     // eram 8 RPCs separadas (financeiro_diff_por_prazo/_regiao/
     // _transportadora/_tipo_cliente, financeiro_peso_frete/_outliers_peso/
@@ -408,12 +426,10 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
   ]);
   for (const res of [
     kpisRes,
-    resumoRes,
     janelasRes,
     transpRes,
     opcoesRes,
     evolucaoRes,
-    diffNRes,
     padroesPesoRes,
     simulacaoRes,
   ]) {
@@ -439,13 +455,12 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
       }
     : null;
 
-  const resumoRow = (resumoRes.data as Record<string, unknown>[])?.[0];
-  const resumo: FinanceiroResumo | null = resumoRow
+  const resumo: FinanceiroResumo | null = kpisRow
     ? {
-        topClienteNome: (resumoRow.top_cliente_nome as string) ?? null,
-        topClienteSoma: resumoRow.top_cliente_soma == null ? null : Number(resumoRow.top_cliente_soma),
-        topRegiaoNome: (resumoRow.top_regiao_nome as string) ?? null,
-        topRegiaoMedia: resumoRow.top_regiao_media == null ? null : Number(resumoRow.top_regiao_media),
+        topClienteNome: (kpisRow.top_cliente_nome as string) ?? null,
+        topClienteSoma: kpisRow.top_cliente_soma == null ? null : Number(kpisRow.top_cliente_soma),
+        topRegiaoNome: (kpisRow.top_regiao_nome as string) ?? null,
+        topRegiaoMedia: kpisRow.top_regiao_media == null ? null : Number(kpisRow.top_regiao_media),
       }
     : null;
 
@@ -495,7 +510,7 @@ async function getFinanceiroData(filtros: FiltrosVisaoGeral): Promise<Financeiro
     diffPosSum: Number(r.diff_pos_sum ?? 0),
   }));
   const maxMes = evolucaoRows[0]?.max_mes != null ? String(evolucaoRows[0].max_mes) : null;
-  const diffNEscNao = Number(diffNRes.data ?? 0);
+  const diffNEscNao = Number(kpisRow?.diff_n_esc_nao_sum ?? 0);
 
   // ---- [FIX 2026-09-18] as 8 tabelas abaixo agora vêm de 1 jsonb só
   // (financeiro_padroes_pesocustagem_dashboard) — ver comentário no
