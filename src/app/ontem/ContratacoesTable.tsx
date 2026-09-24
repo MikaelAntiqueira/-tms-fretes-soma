@@ -12,7 +12,12 @@ import type { OntemLinha } from "./page";
 // Extraído pra Client Component só por causa do estado dos checkboxes —
 // mesmo motivo de RomaneioSimulador/OportunidadesTabsClient (Server
 // Component não pode ter state/onChange).
-export function ContratacoesTable({ linhas, ref }: { linhas: OntemLinha[]; ref: string }) {
+//
+// [FIX 2026-09-24] A prop com a data do dia era chamada `ref` na primeira
+// versão — nome reservado do React (usado para a passagem de refs entre
+// componentes), o que quebrou a hidratação em produção e fez a seção
+// inteira sumir da página (React error #418/#441). Renomeada para `dia`.
+export function ContratacoesTable({ linhas, dia }: { linhas: OntemLinha[]; dia: string }) {
   const [publico, setPublico] = useState(false);
   const [privado, setPrivado] = useState(false);
 
@@ -48,7 +53,7 @@ export function ContratacoesTable({ linhas, ref }: { linhas: OntemLinha[]; ref: 
             PDF é window.print() da página, então imprime só o que está
             visível na tabela filtrada. */}
         <div className="export-actions no-print">
-          <a href={`/ontem/csv?dia=${ref}`} className="export-link-btn">
+          <a href={`/ontem/csv?dia=${dia}`} className="export-link-btn">
             Baixar CSV (todas as notas, sem filtro)
           </a>
           <PrintButton />
