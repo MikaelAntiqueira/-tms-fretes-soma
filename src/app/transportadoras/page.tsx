@@ -70,13 +70,24 @@ import { parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedi
 // TRANSP_ORDER (mesma usada em CARRIER_COLOR pro resto da página) — só 7
 // itens, não vale a pena trocar por uma lista dinâmica.
 //
+// [FIX 2026-09-24] transportadoras_prazo_medio + transportadoras_prazo_hist
+// eram 2 RPCs separadas escaneando a MESMA base (dedup_contr sobre
+// v_ontem_radar) — a página disparava 7 RPCs ao mesmo tempo (Promise.all)
+// contra uma instância pequena do Supabase (2 vCPUs), e a concorrência
+// entre elas estourava o statement_timeout de 8s mesmo cada uma sendo
+// rápida sozinha (reproduzido no navegador logado). Fundidas numa única
+// RPC (mesmo nome transportadoras_prazo_medio, migration
+// consolida_transportadoras_prazo_medio_hist_reduz_concorrencia2) — reduz
+// de 7 para 6 conexões concorrentes. `transportadoras_prazo_hist` como
+// function separada foi DROPADA (só esta página a chamava).
+//
 // Validação esperada (post-deployment, manual): chamada sem args == 7 linhas,
 // R$ 494.417,43 (mesmos números de sempre, regressão zero); chamada com
 // mes='2026-08' deve bater com `select ... from v_ontem_comparacao where
 // cotacao_id in (select cotacao_id from v_cotacao_filtros where mes='2026-08')`.
 //
 // Toda agregação é feita dentro do banco via RPC (`transportadoras_
-// comparativo`, `transportadoras_prazo_medio`, `transportadoras_prazo_hist`,
+// comparativo`, `transportadoras_prazo_medio`,
 // `transportadoras_regiao_comercial`, `transportadoras_clientes_metricas`,
 // `transportadoras_cidades` — migrations `fn_transportadoras_comparativo` +
 // `fix_transportadoras_comparativo_qtdcotada_e_maisbarata` + `fn_
@@ -106,9 +117,9 @@ import { parseMulti, fmtBRL, fmtBRL2, fmtBRLSigned, fmtNum, fmtPct, fmtPrazoMedi
 // essa tabela na verdade usa a MESMA base de `transportadoras_prazo_medio`
 // (prazo da oferta vencedora, só transportadora CONTRATADA, sobre a base
 // cruzada) — bateu dígito a dígito (mean 1.0022075055187638 / N 453 para
-// Fritz Express). Por isso `transportadoras_prazo_hist()` (nova, migration
-// `fix_transportadoras_prazo_hist_universo`) usa essa base, não a de
-// `radar_prazo_hist()` — que permanece intocada, sem uso nesta página.
+// Fritz Express). Por isso a mesma `transportadoras_prazo_medio()` usa
+// essa base, não a de `radar_prazo_hist()` — que permanece intocada, sem
+// uso nesta página.
 //
 // Cidades (nova, 2026-09-12): reaproveita a MESMA lógica de agregação de
 // `operacao_por_cidade()` (view `v_operacao_base`, dedup, campos agregados)
@@ -234,16 +245,24 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
     p_faixas_peso: filtros.faixasPeso,
     p_faixas_cubagem: filtros.faixasCubagem,
   };
-  const [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes, opcoesRes] = await Promise.all([
+  // [FIX 2026-09-24] transportadoras_prazo_medio + transportadoras_prazo_hist
+  // eram 2 RPCs separadas escaneando a MESMA base (dedup_contr sobre
+  // v_ontem_radar) -- a pagina disparava 7 RPCs ao mesmo tempo (Promise.all)
+  // contra uma instancia pequena do Supabase (2 vCPUs), e a concorrencia
+  // entre elas estourava o statement_timeout de 8s mesmo cada uma sendo
+  // rapida sozinha (reproduzido no navegador logado). Fundidas numa unica
+  // RPC (mesmo nome transportadoras_prazo_medio, migration
+  // consolida_transportadoras_prazo_medio_hist_reduz_concorrencia2) -- reduz
+  // de 7 para 6 conexoes concorrentes.
+  const [compRes, prazoMedioRes, regiaoRes, clientesRes, cidadesRes, opcoesRes] = await Promise.all([
     supabase.rpc("transportadoras_comparativo", filtroArgs),
     supabase.rpc("transportadoras_prazo_medio", filtroArgs),
-    supabase.rpc("transportadoras_prazo_hist", filtroArgs),
     supabase.rpc("transportadoras_regiao_comercial", filtroArgs),
     supabase.rpc("transportadoras_clientes_metricas", filtroArgs),
     supabase.rpc("transportadoras_cidades", filtroArgs),
     supabase.rpc("financeiro_filtro_opcoes_cascata", filtroArgs),
   ]);
-  for (const res of [compRes, prazoMedioRes, prazoHistRes, regiaoRes, clientesRes, cidadesRes, opcoesRes]) {
+  for (const res of [compRes, prazoMedioRes, regiaoRes, clientesRes, cidadesRes, opcoesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
@@ -279,10 +298,13 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
   // (diferencaMedia), por nome — só 7 linhas. Só entram transportadoras com
   // AS DUAS métricas presentes (renderQuadrante do Artifact original só
   // plota quem tem prazoN>0 E diffN>0).
-  const prazoMedioRaw: PrazoMedioRawRow[] = ((prazoMedioRes.data as Record<string, unknown>[]) ?? []).map((r) => ({
+  const prazoMedioRaw: (PrazoMedioRawRow & { mediana: number })[] = (
+    (prazoMedioRes.data as Record<string, unknown>[]) ?? []
+  ).map((r) => ({
     transportadora: String(r.transportadora),
     prazo_medio: r.prazo_medio == null ? null : Number(r.prazo_medio),
     prazo_n: Number(r.prazo_n ?? 0),
+    mediana: Number(r.mediana ?? 0),
   }));
   const diferencaPorTransportadora = new Map(comparativo.map((r) => [r.transportadora, r.diferenca_media]));
   const quadrante: PrazoMedioRow[] = prazoMedioRaw
@@ -295,13 +317,16 @@ async function getTransportadorasData(filtros: FiltrosTransp): Promise<Transport
 
   // "Preço × Prazo", Bloco 2 (perfil histórico): ordenado por mediana asc
   // (mesma regra do Artifact original — TRANSP_ORDER.map(...).sort((a,b)=>
-  // a.median-b.median)).
-  const prazoHist: PrazoHistRow[] = ((prazoHistRes.data as Record<string, unknown>[]) ?? [])
+  // a.median-b.median)). [FIX 2026-09-24] "média" aqui é o mesmo
+  // avg(prazo) de prazo_medio (mesma base, mesma conta) — vem do resultado
+  // combinado, não de uma RPC separada mais.
+  const prazoHist: PrazoHistRow[] = prazoMedioRaw
+    .filter((r) => r.prazo_medio != null)
     .map((r) => ({
-      transportadora: String(r.transportadora),
-      mediana: Number(r.mediana ?? 0),
-      media: Number(r.media ?? 0),
-      n: Number(r.n ?? 0),
+      transportadora: r.transportadora,
+      mediana: r.mediana,
+      media: r.prazo_medio as number,
+      n: r.prazo_n,
     }))
     .sort((a, b) => a.mediana - b.mediana || a.media - b.media);
 
