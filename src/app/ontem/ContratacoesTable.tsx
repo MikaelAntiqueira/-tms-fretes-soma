@@ -102,6 +102,22 @@ export function ContratacoesTable({ linhas, dia }: { linhas: OntemLinha[]; dia: 
                     </td>
                     <td className="num" style={style}>
                       {r.diferenca_pct == null ? "—" : fmtPct(r.diferenca_pct)}
+                      {/* [2026-09-25] Migration add_agrupamento_e_valor_cobrado
+                          -- não mexe na conta de diferenca_pct (continua igual
+                          a /financeiro e /oportunidades), só sinaliza aqui
+                          quando o peso do frete contratado diverge >20% do
+                          peso que estava na cotação vinculada: sinal de que o
+                          CT-e cobrou por notas agrupadas depois da cotação
+                          (achado no romaneio 36967: cotação 65kg, CT-e
+                          320kg -- inflava a Diferença % pra 702%). */}
+                      {r.possivel_agrupamento && (
+                        <span
+                          title="Possível agrupamento de notas: o peso do frete contratado é bem maior que o peso da cotação vinculada -- provavelmente o CT-e juntou mais de uma NF depois que a cotação já tinha sido feita, e essa diferença está inflada."
+                          style={{ marginLeft: 4, cursor: "help" }}
+                        >
+                          ⚠️
+                        </span>
+                      )}
                     </td>
                     <td>
                       <EscPill e={r.escolheu} />
