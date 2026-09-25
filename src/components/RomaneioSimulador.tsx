@@ -26,6 +26,14 @@ export interface PedidoSimulado {
   contratada_transportadora_id: string | null;
   contratada_transportadora: string | null;
   contratada_valor: number;
+  // [2026-09-25] Migration add_agrupamento_e_valor_cobrado (repo Python
+  // "PROJETO FRETE COTADO X FRETE CONTRATADO") -- valor_frete_cobrado é o
+  // valor REAL do CT-e quando disponível; possivel_agrupamento sinaliza
+  // quando o peso real diverge >20% do peso cotado (CT-e cobrando por notas
+  // agrupadas depois da cotação) -- não muda contratada_valor nem a conta
+  // de diff abaixo, só avisa.
+  valor_frete_cobrado: number | null;
+  possivel_agrupamento: boolean;
   ofertas: OfertaSimulada[];
 }
 
@@ -78,6 +86,14 @@ function PedidoRow({ p }: { p: PedidoSimulado }) {
               {diff === 0
                 ? "mais barata"
                 : `${diff > 0 ? "+" : ""}${fmtBRL(diff)}${diffFrac != null ? ` (${fmtPct(diffFrac)})` : ""}`}
+            </span>
+          )}
+          {p.possivel_agrupamento && (
+            <span
+              title="Possível agrupamento de notas: o peso do frete contratado é bem maior que o peso da cotação vinculada -- provavelmente o CT-e juntou mais de uma NF depois que a cotação já tinha sido feita, e essa comparação está inflada."
+              style={{ marginLeft: 4, cursor: "help" }}
+            >
+              ⚠️
             </span>
           )}
         </div>
