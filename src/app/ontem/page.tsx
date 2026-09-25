@@ -76,6 +76,16 @@ export interface OntemLinha {
   nf: string | null;
   endereco_entrega: string | null;
   tipo_cliente: string | null;
+  // [2026-09-25] Migration add_agrupamento_e_valor_cobrado (repo Python
+  // "PROJETO FRETE COTADO X FRETE CONTRATADO", docs/migration-2026092501-
+  // agrupamento-valor-cobrado.sql) -- true quando o peso real do frete
+  // contratado diverge >20% do peso que estava na cotação vinculada, sinal
+  // de que o CT-e cobrou por notas agrupadas depois da cotação (achado no
+  // romaneio 36967: cotação de 65kg, CT-e de 320kg -- inflava a Diferença %
+  // artificialmente pra 702%). Não muda diferenca_r/diferenca_pct/escolheu
+  // -- só sinaliza pra quem está lendo a tabela.
+  possivel_agrupamento: boolean;
+  valor_frete_cobrado: number | null;
 }
 
 interface OntemCobertura {
@@ -662,6 +672,8 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
     nf: (r.nf as string) ?? null,
     endereco_entrega: (r.endereco_entrega as string) ?? null,
     tipo_cliente: (r.tipo_cliente as string) ?? null,
+    possivel_agrupamento: Boolean(r.possivel_agrupamento),
+    valor_frete_cobrado: r.valor_frete_cobrado == null ? null : Number(r.valor_frete_cobrado),
   }));
 
   const cobertura: OntemCobertura | null = coberturaRow
@@ -699,6 +711,11 @@ async function getOntemData(diaEscolhido: string | null): Promise<OntemData> {
         p.contratada_transportadora_id == null ? null : String(p.contratada_transportadora_id),
       contratada_transportadora: (p.contratada_transportadora as string) ?? null,
       contratada_valor: Number(p.contratada_valor ?? 0),
+      // [2026-09-25] mesma migration add_agrupamento_e_valor_cobrado --
+      // sinaliza no cartão do pedido quando o peso real diverge >20% do
+      // peso cotado (agrupamento de notas depois da cotação).
+      valor_frete_cobrado: p.valor_frete_cobrado == null ? null : Number(p.valor_frete_cobrado),
+      possivel_agrupamento: Boolean(p.possivel_agrupamento),
       ofertas: ((p.ofertas as Record<string, unknown>[]) ?? []).map((o) => ({
         transportadora_id: String(o.transportadora_id),
         transportadora: (o.transportadora as string) ?? null,
