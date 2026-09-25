@@ -72,6 +72,12 @@ export async function GET(request: Request) {
     "Escolheu a mais barata",
     "Janela",
     "Endereco de entrega",
+    // [2026-09-25] Migration add_agrupamento_e_valor_cobrado -- coluna nova
+    // no fim, mesma convenção das outras colunas novas do RPC (nunca no
+    // meio). "Sim" quando o peso do frete contratado diverge >20% do peso
+    // da cotação vinculada -- sinal de que o CT-e cobrou por notas
+    // agrupadas depois da cotação, o que infla a "Diferenca %" acima.
+    "Possivel agrupamento de notas",
   ];
 
   const rows = linhas.map((r) => {
@@ -90,6 +96,7 @@ export async function GET(request: Request) {
       csvField(fmtEscolheuLabel(String(r.escolheu ?? ""))),
       csvField(r.janela as string | null),
       csvField(r.endereco_entrega as string | null),
+      r.possivel_agrupamento ? "Sim" : "Nao",
     ].join(";");
   });
 
