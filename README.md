@@ -1,5 +1,21 @@
 # TMS Fretes SOMA — V3 (Next.js + Supabase)
 
+> **🌐 Projeto em produção:** [tms-fretes-soma.vercel.app](https://tms-fretes-soma.vercel.app)
+
+**Contexto:** Grupo SOMA/RS Produtos Hospitalares (Grupo SOMA Hospitalar) opera distribuição hospitalar no Rio Grande do Sul com múltiplas transportadoras. EsteTMS automatiza a comparação entre **Frete Cotado × Frete Contratado**, permitindo: visibilidade de todas as ofertas de frete, cruzamento com contratações e faturas, e indicadores de desempenho por transportadora/lane/período. É a base para decidir com dado, não só conferir — e para negociar melhor com as transportadoras.
+
+**Tecnologias:** Next.js 14 (App Router, TypeScript, Tailwind CSS) + Supabase (Postgres + Auth) + Vercel + Python (pipeline de extração de dados, rodando em paralelo).
+
+---
+
+Camada de inteligência sobre o TMS do Grupo SOMA/RS Produtos Hospitalares —
+comparação **Frete Cotado × Frete Contratado**. Este repositório é a
+**migração V3** do dashboard atual (um Artifact HTML/Chart.js alimentado por
+um pipeline Python em lote) para **Next.js (App Router, TypeScript, Tailwind
+CSS) + Supabase (Postgres/Auth)**, hospedado na Vercel.
+
+# TMS Fretes SOMA — V3 (Next.js + Supabase)
+
 Camada de inteligência sobre o TMS do Grupo SOMA/RS Produtos Hospitalares —
 comparação **Frete Cotado × Frete Contratado**. Este repositório é a
 **migração V3** do dashboard atual (um Artifact HTML/Chart.js alimentado por
